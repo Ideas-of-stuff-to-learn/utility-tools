@@ -26,6 +26,7 @@
 |---|------|----------|--------|------------|
 | [1](#1--isolate-auth-into-shared-auth--billing-service) | Isolate auth into shared service | 🔴 P1 | 2–3 weeks | Very High |
 | [2](#2--company-landing-page) | Company landing page | 🔴 P1 | 3–5 days | Medium |
+| [26](#26--admin-session-isolation-explicit-re-login-required) | Admin session isolation (explicit re-login) | 🔴 P1 | 1–2 days | Medium |
 | [22](#22--admin-panel-security-hardening) | Admin panel security hardening | 🔴 P1 | 1–2 weeks | High |
 | [3](#3--stripe-billing-integration) | Stripe billing integration | 🔴 P1 | 1–2 weeks | High |
 | [4](#4--webhook-listener-subscription-status-sync) | Webhook listener (subscription sync) | 🔴 P1 | 3–5 days | High |
@@ -504,6 +505,42 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 
 ---
 
+## 26 — Admin session isolation (explicit re-login required)
+
+**Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🔴 P1 &nbsp;·&nbsp; **Effort:** 1–2 days &nbsp;·&nbsp; **Complexity:** Medium  
+**Do before Task 22** — this is the most fundamental admin security property. All other hardening sits on top of it.
+
+**The problem (current behaviour):** The admin panel calls `GET /auth/me` with `credentials: 'include'`, which sends the same httpOnly cookie the landing page login sets. If you're logged in on the landing page as an owner-level account and navigate directly to the admin panel, the `getMe()` check succeeds and you are auto-logged in — no admin login required. This means a compromised landing session = compromised admin panel.
+
+**The requirement:** Landing page login must never grant admin panel access. Admin panel must always require its own explicit login, even from the same account with the same credentials. The sessions are separate, independently revokable, and independently expiring.
+
+**What it involves:**
+
+- **Backend — new admin auth endpoints:**
+  - `POST /admin/auth/login` — same credential check as `/auth/login`, but issues a separate `admin_access_token` JWT cookie (different cookie name, `HttpOnly`, `SameSite=Strict`, shorter expiry e.g. 2h).
+  - `POST /admin/auth/refresh` — refreshes the admin access token using a separate `admin_refresh_token` cookie.
+  - `POST /admin/auth/logout` — clears only the admin cookies; does not touch the regular user session.
+  - `GET /auth/me` called from admin panel replaced with admin-specific identity check that validates the `admin_access_token` cookie only.
+  - Regular `/auth/login` never sets `admin_access_token` or `admin_refresh_token` — the two cookie namespaces are strictly separate.
+
+- **Admin panel `api.js`:**
+  - `login()` → calls `/admin/auth/login`; stores `csrf_admin_access_token` / `csrf_admin_refresh_token` in memory.
+  - `logout()` → calls `/admin/auth/logout`.
+  - `getMe()` → calls a new `/admin/auth/me` endpoint (or `/auth/me` but with admin cookie only — see backend).
+  - All `authFetch` calls send `X-CSRF-TOKEN: csrf_admin_access_token` (not the regular user CSRF token).
+
+- **Admin `App.jsx`:**
+  - No change to logic — `authState === 'loading'` check still calls `getMe()`; it just now correctly returns 401 if there's no admin session regardless of landing page login state.
+
+- **Session expiry:** Admin sessions expire after 2h (or a shorter configurable value). No silent auto-refresh on long idle — force re-login. This is appropriate for a high-privilege panel.
+
+- **No UI change** from the user's perspective — they still use the same username/password on the admin login form; it just always requires them to enter it.
+
+**What it touches:**  
+`tools/cashflow/API/routes/auth.py` (new `/admin/auth/*` endpoints, separate cookie names) · `admin/src/api.js` (new endpoint URLs, separate CSRF token vars) · `tools/cashflow/API/backend.py` (cookie config for admin cookies)
+
+---
+
 ## 22 — Admin panel security hardening
 
 **Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🔴 P1 &nbsp;·&nbsp; **Effort:** 1–2 weeks &nbsp;·&nbsp; **Complexity:** High  
@@ -596,7 +633,7 @@ Safari Private Browsing and some iOS/Android browser configurations may deny IDB
 ## Dependency Order
 
 ```
-22 (Admin security hardening) ──► 3 (Stripe)    [security must be solid before billing goes live]
+26 (Admin session isolation) ──► 22 (Admin security hardening) ──► 3 (Stripe)  [session isolation is the prerequisite for all admin security]
 23 (Role creation ceiling) ──► 24 (Level auto-calc)  [small, do together in one session]
 25 (IndexedDB) ──► 3 (Stripe)                    [client persistence needed before Stripe UX]
 

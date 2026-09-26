@@ -277,7 +277,35 @@ These are scoped and queued — not yet in the implementation order above. They 
 
 ---
 
-### 11a. Admin Panel Security Hardening (Task 22)
+### 11a. Admin Session Isolation — Explicit Re-Login Required (Task 26)
+
+**This is a prerequisite for Task 22 and all admin security hardening.** It is the most fundamental admin security property.
+
+**Current broken state:** Admin panel calls `GET /auth/me` with `credentials: 'include'`, sending the same httpOnly cookie the landing page sets. Landing page login → navigate to admin → auto-logged in. A compromised user session = compromised admin panel.
+
+**Required behaviour:** Landing page login never grants admin panel access. Admin panel always requires its own explicit login. Sessions are separate, separately revokable, separately expiring.
+
+**Backend changes:**
+- `POST /admin/auth/login` — validates credentials, issues `admin_access_token` + `admin_refresh_token` cookies (different names from `access_token`/`refresh_token`).
+  - Cookie config: `HttpOnly=True`, `SameSite=Strict`, `Secure=True` in production.
+  - Access token expiry: 2h (shorter than regular session — high-privilege panel).
+  - Refresh token expiry: 24h (shorter than regular 30-day refresh).
+- `POST /admin/auth/refresh` — refreshes using `admin_refresh_token` only.
+- `POST /admin/auth/logout` — clears admin cookies only; does not touch regular session.
+- `GET /admin/auth/me` — returns identity but validates `admin_access_token` only; 401 if absent regardless of regular session.
+- Regular `POST /auth/login` explicitly must never set admin cookies.
+
+**Admin `api.js` changes:**
+- `login()` → `POST /admin/auth/login`; stores `csrf_admin_access_token` in memory.
+- `getMe()` → `GET /admin/auth/me`.
+- `logout()` → `POST /admin/auth/logout`.
+- All `authFetch` sends `X-CSRF-TOKEN: csrf_admin_access_token`.
+
+**No UI change** — same login form, same credentials, just always requires entry.
+
+---
+
+### 11b. Admin Panel Security Hardening (Task 22) — depends on 26
 
 The admin panel is owner-facing infrastructure and must be hardened before billing goes live.
 
