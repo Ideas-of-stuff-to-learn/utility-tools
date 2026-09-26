@@ -542,10 +542,16 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 
 - **Admin panel "Create account" link** on the login form either removed or points to a "provisioned by owner only" info screen.
 
+- **MFA (TOTP) required on every admin login** — Google Authenticator / Authy compatible. A stolen admin password alone gets nothing without the physical device. Stored as `totp_secret` on `admin_users`. Enrolment happens on first login; cannot be skipped.
+
+- **Login attempt audit log** — every admin login attempt (success or fail) written to an `admin_login_log` table: timestamp, IP, user agent, outcome. Owner can review full history from the admin panel.
+
+- **Device fingerprinting / new-device confirmation** — first login from an unrecognised IP or device triggers an out-of-band confirmation to a pre-registered notification address (e.g. owner email). Unrecognised device is blocked until confirmed. Device recognition stored server-side (hashed fingerprint), not in client storage.
+
 **Relationship to Task 26:** Once Task 27 is done, Task 26's session cookie isolation is straightforward — `/admin/auth/login` already hits a different table, so the cookies it issues are naturally scoped to admin sessions. Tasks 27 + 26 should be built together in the same session.
 
 **What it touches:**  
-`tools/cashflow/API/routes/auth.py` (new `/admin/auth/*` endpoints against `admin_users`) · `tools/cashflow/API/schema.sql` (new `admin_users` table) · Flask CLI bootstrap command · `admin/src/screens/Auth/SignupScreen.jsx` (remove or replace) · `admin/src/App.jsx` (remove signup auth state) · `tools/cashflow/API/routes/admin.py` (all role/permission helpers query `admin_users`)
+`tools/cashflow/API/routes/auth.py` (new `/admin/auth/*` endpoints against `admin_users`) · `tools/cashflow/API/schema.sql` (new `admin_users` table, `admin_login_log` table) · Flask CLI bootstrap command · `admin/src/screens/Auth/SignupScreen.jsx` (remove or replace) · `admin/src/App.jsx` (remove signup auth state) · `tools/cashflow/API/routes/admin.py` (all role/permission helpers query `admin_users`) · TOTP library (`pyotp`)
 
 ---
 
@@ -578,10 +584,16 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 
 - **Session expiry:** Admin sessions expire after 2h (or a shorter configurable value). No silent auto-refresh on long idle — force re-login. This is appropriate for a high-privilege panel.
 
-- **No UI change** from the user's perspective — they still use the same username/password on the admin login form; it just always requires them to enter it.
+- **Concurrent session limit** — only one active admin session per account at a time. A second login kills the first. No silent background sessions accumulating.
+
+- **Idle timeout** — 30 minutes of inactivity in the admin panel triggers automatic logout client-side, with a server-side session revocation on next request. Configurable via env.
+
+- **Re-authentication for destructive actions** — permanently deleting a user, deleting a role, or any billing-related action prompts for password re-entry even within an active session. Possession of a valid session alone is not sufficient for the most dangerous operations.
+
+- **No UI change** from the user's perspective beyond the re-auth prompt on destructive actions.
 
 **What it touches:**  
-`tools/cashflow/API/routes/auth.py` (new `/admin/auth/*` endpoints, separate cookie names) · `admin/src/api.js` (new endpoint URLs, separate CSRF token vars) · `tools/cashflow/API/backend.py` (cookie config for admin cookies)
+`tools/cashflow/API/routes/auth.py` (new `/admin/auth/*` endpoints, separate cookie names, session revocation) · `admin/src/api.js` (new endpoint URLs, separate CSRF token vars) · `tools/cashflow/API/backend.py` (cookie config for admin cookies) · `admin/src/App.jsx` (idle timeout timer, re-auth modal)
 
 ---
 
@@ -598,9 +610,13 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 - **CSRF protection** — SameSite=Strict on admin session cookies; double-submit cookie pattern or CSRF token for all state-changing admin API calls.
 - **Injection hardening** — audit all admin routes for raw string interpolation in SQL (should all be parameterised already, but verify); same for any shell calls.
 - **Audit log** — all state-changing admin actions (role create/edit/delete, user reassign, category delete) already log to impersonation log; extend to cover all mutations with actor IP + timestamp.
+- **Request signing (HMAC)** — all admin API calls from the frontend include a timestamp + HMAC signature computed from the request body + a session-derived secret. Backend rejects requests where the signature is missing, expired (>30s old), or invalid. Prevents replayed or externally crafted API calls.
+- **Immutable audit trail** — all state-changing admin actions appended to a write-only `admin_audit_log` table (INSERT only, no UPDATE/DELETE allowed at the DB level via a trigger or role restriction). Forensic record that cannot be tampered with even by the owner account.
+- **Rate limit on panel URL** — not just API endpoints; the admin panel's HTML page load itself is rate-limited by IP to slow enumeration of whether the panel exists at a given path.
+- **Non-obvious URL path** — admin panel served at a configurable path (env var `ADMIN_PANEL_PATH`, default not `/admin`). Security through obscurity is weak alone but meaningfully increases attacker friction when combined with the other layers.
 
 **What it touches:**  
-`tools/cashflow/API/routes/admin.py` · `tools/cashflow/API/backend.py` (headers, CORS, cookie config) · `tools/cashflow/API/rate_limits.py` · admin panel Nginx/Render config (if applicable)
+`tools/cashflow/API/routes/admin.py` · `tools/cashflow/API/backend.py` (headers, CORS, cookie config, HMAC verification middleware) · `tools/cashflow/API/rate_limits.py` · `tools/cashflow/API/schema.sql` (`admin_audit_log` table) · admin panel Nginx/Render config · `vite.config.js` (base path if URL path changes)
 
 ---
 

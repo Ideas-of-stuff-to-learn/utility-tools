@@ -307,6 +307,12 @@ CREATE TABLE admin_users (
 
 **Role system reused** — `admin_users.role_id` references existing `roles` table; permission checks work as before, just against `admin_users` identity.
 
+**MFA (TOTP) required** — `totp_secret` column on `admin_users`. Enrolment mandatory on first login, cannot be skipped. `pyotp` server-side. Stolen password alone grants nothing.
+
+**Login attempt audit** — `admin_login_log` table (timestamp, IP, user agent, outcome) on every attempt. Owner can review full history.
+
+**Device fingerprinting** — first login from unrecognised IP/device triggers out-of-band confirmation to owner's notification address. Device blocked until confirmed. Fingerprint stored server-side (hashed), never client-side.
+
 ---
 
 ### 11c. Admin Session Isolation — Explicit Re-Login Required (Task 26) — depends on 27
@@ -333,7 +339,12 @@ CREATE TABLE admin_users (
 - `logout()` → `POST /admin/auth/logout`.
 - All `authFetch` sends `X-CSRF-TOKEN: csrf_admin_access_token`.
 
-**No UI change** — same login form, same credentials, just always requires entry.
+**Additional session hardening:**
+- **Concurrent session limit** — one active admin session per account. Second login kills the first (server-side JTI revocation).
+- **Idle timeout** — 30 min inactivity → automatic logout. Client timer resets on interaction; server revokes session on next request after timeout.
+- **Re-authentication for destructive actions** — permanent deletion, billing config changes require password re-entry mid-session. Active session alone is not sufficient for highest-risk operations.
+
+**No UI change** beyond the re-auth prompt on destructive actions.
 
 ---
 
@@ -369,6 +380,24 @@ The admin panel is owner-facing infrastructure and must be hardened before billi
 
 **SQL injection audit**
 - All admin routes already use parameterised queries (psycopg2 `%s` style) — verify no raw string interpolation exists in admin.py, categories.py, or any helper.
+
+**Request signing (HMAC)**
+- All admin API calls from frontend include timestamp + HMAC signature (body hash signed with a session-derived secret).
+- Backend rejects requests where signature is missing, expired (>30s), or invalid.
+- Prevents replayed or externally crafted API calls even with a stolen CSRF token.
+
+**Immutable audit trail**
+- `admin_audit_log` table — INSERT only. DB-level trigger or role restriction prevents UPDATE/DELETE even by owner.
+- Every state-changing admin action appended: actor, action type, target entity, before/after state snapshot, timestamp, IP.
+- Forensic record that cannot be tampered with.
+
+**Rate limit on panel URL itself**
+- Not just API endpoints — the admin panel HTML page load is rate-limited by IP.
+- Slows enumeration of whether the panel exists at a given path.
+
+**Non-obvious URL path**
+- Admin panel served at a configurable path (`ADMIN_PANEL_PATH` env var, default not `/admin`).
+- Weak alone but meaningfully increases attacker friction when combined with all other layers.
 
 ---
 
