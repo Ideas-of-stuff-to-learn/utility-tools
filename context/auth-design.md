@@ -31,7 +31,7 @@ Workspace / tool selector
 └── shared/           ← auth logic, shared types, common utils
 ```
 
-**One monorepo** — not separate repos per tool. Rationale: one person, one CI/CD pipeline, shared auth code not duplicated, scales without coordination overhead until there are separate teams.
+**One monorepo, one backend** — Render free tier limits to one backend service; a physically separate auth service is not feasible. Auth routes stay in the same Flask app but are maximally isolated: own blueprint, no cross-imports, `tools` claim in JWT so the architecture is multi-tool ready. Physical extraction deferred until paid tier or separate deployment becomes viable.
 
 ---
 
@@ -256,6 +256,8 @@ Before any paying users, every DB query touching `transactions`, `categorized_re
 7. Google OAuth                                           ← highest demand social login
 8. Microsoft OAuth                                        ← same code path, low marginal effort
 9. Stripe billing + webhooks + feature gating             ← last, depends on all above
+
+**Constraint note:** Tasks 1 and the shared-service concept are scoped to max isolation on a single Render backend, not physical service extraction. `tools` JWT claim is added so multi-tool gating works without needing a separate service.
 10. Free trial config                                     ← part of Stripe setup
 ```
 

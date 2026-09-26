@@ -24,8 +24,8 @@
 
 | # | Task | Priority | Effort | Complexity |
 |---|------|----------|--------|------------|
-| [1](#1--isolate-auth-into-shared-auth--billing-service) | Isolate auth into shared service | 🔴 P1 | 2–3 weeks | Very High |
-| [2](#2--company-landing-page) | Company landing page | 🔴 P1 | 3–5 days | Medium |
+| [1](#1--auth-isolation--max-isolation-on-single-backend) | Auth isolation (max isolation, single backend) | 🔴 P1 | 1–2 weeks | High |
+| [2](#2--company-landing-page) | ~~Company landing page~~ | 🔴 P1 | 3–5 days | Medium |
 | [27](#27--admin-credential-isolation-separate-admin-user-accounts) | Admin credential isolation (separate admin accounts) | 🔴 P1 | 2–3 days | Medium |
 | [26](#26--admin-session-isolation-explicit-re-login-required) | Admin session isolation (explicit re-login) | 🔴 P1 | 1–2 days | Medium |
 | [22](#22--admin-panel-security-hardening) | Admin panel security hardening | 🔴 P1 | 1–2 weeks | High |
@@ -58,43 +58,38 @@
 
 ---
 
-### 1 · Isolate auth into shared Auth & Billing Service
+### 1 · Auth isolation — max isolation on single backend
 
 **Priority:** 🔴 P1 — Critical  
-**Effort:** 2–3 weeks  
-**Complexity:** Very High  
-**Why first:** Every other task in this section depends on a single identity layer existing. Cashflow's current auth (login, signup, auto-login, JWT, bcrypt, refresh, revocation) needs to be extracted and deployed as a standalone service that any future tool can point at.
+**Effort:** 1–2 weeks  
+**Complexity:** High  
+**Constraint:** Render free tier limits to one backend service — a genuinely separate auth service is not feasible. Goal is maximum internal isolation and security hardening within the existing Flask backend, not physical extraction.
 
-**What it involves:**
-- Extract login, signup, logout, refresh, and `/auth/me` out of Cashflow's Flask backend into a new standalone service (new repo or clearly isolated sub-service)
-- New shared `users` table with: unique ID, email, username, bcrypt-hashed password
-- JWT issuance updated to include a `tools` claim — a list of tool IDs the user has active access to (starts with `["cashflow"]` for existing users)
-- Auto-login (silent re-auth on page load via refresh token) must continue to work post-extraction
-- Cashflow's backend stops owning auth — all auth routes delegate to, or are removed in favour of, the shared service
-- Decide: keep rolling own auth (current approach, works fine) vs. move to managed provider (Supabase Auth / Clerk) — spec recommends own at this scale
-- CORS, cookie domain, and cross-origin session strategy agreed before build
+**What was already done (2026-09-23):**
+- Auth UI moved to `landing/` — login/signup live on the landing page, not inside Cashflow
+- Cashflow moved to `tools/cashflow/` — cleaner separation at the repo level
+- Landing page redirects into Cashflow post-auth
+
+**What remains (internal isolation + security tightening):**
+- **Blueprint isolation** — auth routes (`/auth/*`) confirmed in their own Flask blueprint with no imports from Cashflow tool modules. Cashflow routes must not import from auth module either. Hard boundary enforced by code structure.
+- **`tools` claim in JWT** — add `"tools": ["cashflow"]` to JWT payload on issuance. Architecture is then multi-tool ready even on a single backend. Cashflow routes verify `"cashflow"` is in the claim before serving.
+- **Strict CORS** — `CORS` config locked to explicit allowed origins only (`landing` URL + `cashflow` URL). Wildcard `*` not permitted on any protected route.
+- **Transit security** — all cookies `Secure=True` + `HttpOnly=True` + `SameSite=Strict` in production. No sensitive data in JWT payload beyond `sub`, `role`, `tools`. Short access token expiry (15–30 min), refresh via httpOnly cookie only.
+- **Input sanitisation on all auth endpoints** — email format validation, username length/character limits, password length floor, no null bytes. Reject at parse time before any DB query.
+- **Auth module self-contained** — `routes/auth.py` + `email_service.py` must have no dependency on any Cashflow-specific module. Future tools can be added by registering their blueprint on the same Flask app without touching auth code.
+- **Isolation audit** — confirm every DB query in `routes/auth.py` filters by the authenticated `user_id`; no query accidentally returns another user's data.
 
 **What it touches:**  
-`App/API/routes/auth.py` · `App/API/routes/preferences.py` · `App/WebUI/src/appState/AuthContext.jsx` · `App/WebUI/src/api.jsx` · `App/API/schema.sql` · `App/API/backend.py` · all JWT-dependent routes · deployment config on Render
+`tools/cashflow/API/routes/auth.py` · `tools/cashflow/API/backend.py` (CORS, cookie config) · `tools/cashflow/API/routes/` (all blueprints — confirm no cross-import) · JWT issuance (add `tools` claim) · all JWT-dependent routes (verify `tools` claim)
 
 ---
 
 ### 2 · Company landing page
 
+**Status:** `[x]` Done — 2026-09-23  
 **Priority:** 🔴 P1 — Critical  
-**Effort:** 3–5 days  
-**Complexity:** Medium  
-**Why first:** The shared service needs a home. This is the public-facing page users land on, see the product line, and are directed to login/subscribe. Must exist before subdomain linkage and Stripe flow can be tested end-to-end.
 
-**What it involves:**
-- Standalone site (separate from Cashflow) listing the company's tools with descriptions and subscribe/login CTAs
-- Links to each deployed tool (initially just Cashflow)
-- Login/signup redirects to the shared auth service, then back to the chosen tool
-- Design consistent with the overall brand
-- Deployed independently (its own Render service or static host)
-
-**What it touches:**  
-New repo / new deployment · shared auth service (redirect URLs) · Stripe Checkout URLs per tool
+Landing page lives at `landing/`, deployed to GitHub Pages. Auth (login/signup/forgot password) lives here. Cashflow is accessible from the landing page post-auth. Core requirement met — auth UI is at the platform level, not inside the tool.
 
 ---
 
