@@ -277,7 +277,39 @@ These are scoped and queued — not yet in the implementation order above. They 
 
 ---
 
-### 11a. Admin Session Isolation — Explicit Re-Login Required (Task 26)
+### 11a. Admin Credential Isolation — Separate Admin User Accounts (Task 27)
+
+**Do first — this is the foundation for Tasks 26 and 22.**
+
+Admin panel users are a completely separate user base. A Cashflow username/password cannot be used to log into the admin panel. They live in different tables, checked against different credentials.
+
+**`admin_users` table** (new):
+```sql
+CREATE TABLE admin_users (
+    id              SERIAL PRIMARY KEY,
+    username        TEXT UNIQUE NOT NULL,
+    password_hash   TEXT NOT NULL,
+    role_id         INTEGER REFERENCES roles(id),
+    created_by      INTEGER REFERENCES admin_users(id),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_login_at   TIMESTAMPTZ,
+    login_locked    BOOLEAN NOT NULL DEFAULT false,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until    TIMESTAMPTZ
+);
+```
+
+**Bootstrap:** `flask create-admin` CLI command creates the first owner-level admin account. Runs once on deploy; credentials entered at that point, not hardcoded.
+
+**`POST /admin/auth/login`** queries `admin_users`, never `users`.
+
+**Admin signup removed.** New admin accounts created by owner inside the admin panel (Users screen → "Add admin user"). `admin/src/screens/Auth/SignupScreen.jsx` removed or replaced with info screen. No self-signup path.
+
+**Role system reused** — `admin_users.role_id` references existing `roles` table; permission checks work as before, just against `admin_users` identity.
+
+---
+
+### 11c. Admin Session Isolation — Explicit Re-Login Required (Task 26) — depends on 27
 
 **This is a prerequisite for Task 22 and all admin security hardening.** It is the most fundamental admin security property.
 
@@ -305,7 +337,7 @@ These are scoped and queued — not yet in the implementation order above. They 
 
 ---
 
-### 11b. Admin Panel Security Hardening (Task 22) — depends on 26
+### 11d. Admin Panel Security Hardening (Task 22) — depends on 26 + 27
 
 The admin panel is owner-facing infrastructure and must be hardened before billing goes live.
 

@@ -26,6 +26,7 @@
 |---|------|----------|--------|------------|
 | [1](#1--isolate-auth-into-shared-auth--billing-service) | Isolate auth into shared service | 🔴 P1 | 2–3 weeks | Very High |
 | [2](#2--company-landing-page) | Company landing page | 🔴 P1 | 3–5 days | Medium |
+| [27](#27--admin-credential-isolation-separate-admin-user-accounts) | Admin credential isolation (separate admin accounts) | 🔴 P1 | 2–3 days | Medium |
 | [26](#26--admin-session-isolation-explicit-re-login-required) | Admin session isolation (explicit re-login) | 🔴 P1 | 1–2 days | Medium |
 | [22](#22--admin-panel-security-hardening) | Admin panel security hardening | 🔴 P1 | 1–2 weeks | High |
 | [3](#3--stripe-billing-integration) | Stripe billing integration | 🔴 P1 | 1–2 weeks | High |
@@ -505,6 +506,49 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 
 ---
 
+## 27 — Admin credential isolation (separate admin user accounts)
+
+**Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🔴 P1 &nbsp;·&nbsp; **Effort:** 2–3 days &nbsp;·&nbsp; **Complexity:** Medium  
+**Do before Task 26** — credential isolation is the foundation; session isolation (Task 26) builds on top of it.
+
+**The requirement:** Admin panel accounts are a completely separate user base from Cashflow users. A Cashflow username + password cannot be entered on the admin panel login screen and succeed — they live in different tables and are checked against different credentials. A leaked Cashflow account gives zero admin access by definition.
+
+**What it involves:**
+
+- **New `admin_users` table:**
+  ```sql
+  CREATE TABLE admin_users (
+      id           SERIAL PRIMARY KEY,
+      username     TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role_id      INTEGER REFERENCES roles(id),
+      created_by   INTEGER REFERENCES admin_users(id),
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_login_at TIMESTAMPTZ,
+      login_locked  BOOLEAN NOT NULL DEFAULT false,
+      failed_attempts INTEGER NOT NULL DEFAULT 0,
+      locked_until  TIMESTAMPTZ
+  );
+  ```
+  No email column initially — admin accounts are internal, owner-provisioned, no self-signup or password reset flow needed at first.
+
+- **Bootstrap:** A Flask CLI command (`flask create-admin`) or a one-time migration seed that creates the first owner-level admin account. Owner runs this once on deploy; credentials are set there, not in code.
+
+- **`POST /admin/auth/login`** checks `admin_users` table, not `users`. Password verified against `admin_users.password_hash`. Never touches the main `users` table.
+
+- **Admin panel signup screen removed.** No public signup path exists. New admin accounts are created by the owner inside the admin panel itself (Users screen → "Add admin user" — owner-only action). The existing signup screen on the admin panel (`SignupScreen.jsx`) is removed or replaced with a "Contact your system administrator" message.
+
+- **Role/permission system reused** — `admin_users.role_id` references the existing `roles` table. The permission check system already in place continues to work; it just now queries `admin_users` instead of `users` for the caller's role.
+
+- **Admin panel "Create account" link** on the login form either removed or points to a "provisioned by owner only" info screen.
+
+**Relationship to Task 26:** Once Task 27 is done, Task 26's session cookie isolation is straightforward — `/admin/auth/login` already hits a different table, so the cookies it issues are naturally scoped to admin sessions. Tasks 27 + 26 should be built together in the same session.
+
+**What it touches:**  
+`tools/cashflow/API/routes/auth.py` (new `/admin/auth/*` endpoints against `admin_users`) · `tools/cashflow/API/schema.sql` (new `admin_users` table) · Flask CLI bootstrap command · `admin/src/screens/Auth/SignupScreen.jsx` (remove or replace) · `admin/src/App.jsx` (remove signup auth state) · `tools/cashflow/API/routes/admin.py` (all role/permission helpers query `admin_users`)
+
+---
+
 ## 26 — Admin session isolation (explicit re-login required)
 
 **Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🔴 P1 &nbsp;·&nbsp; **Effort:** 1–2 days &nbsp;·&nbsp; **Complexity:** Medium  
@@ -633,7 +677,7 @@ Safari Private Browsing and some iOS/Android browser configurations may deny IDB
 ## Dependency Order
 
 ```
-26 (Admin session isolation) ──► 22 (Admin security hardening) ──► 3 (Stripe)  [session isolation is the prerequisite for all admin security]
+27 (Admin credential isolation) ──► 26 (Session isolation) ──► 22 (Security hardening) ──► 3 (Stripe)
 23 (Role creation ceiling) ──► 24 (Level auto-calc)  [small, do together in one session]
 25 (IndexedDB) ──► 3 (Stripe)                    [client persistence needed before Stripe UX]
 
