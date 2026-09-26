@@ -26,9 +26,13 @@
 |---|------|----------|--------|------------|
 | [1](#1--isolate-auth-into-shared-auth--billing-service) | Isolate auth into shared service | 🔴 P1 | 2–3 weeks | Very High |
 | [2](#2--company-landing-page) | Company landing page | 🔴 P1 | 3–5 days | Medium |
+| [22](#22--admin-panel-security-hardening) | Admin panel security hardening | 🔴 P1 | 1–2 weeks | High |
 | [3](#3--stripe-billing-integration) | Stripe billing integration | 🔴 P1 | 1–2 weeks | High |
 | [4](#4--webhook-listener-subscription-status-sync) | Webhook listener (subscription sync) | 🔴 P1 | 3–5 days | High |
 | [5](#5--per-tool-jwt-access-gating) | Per-tool JWT access gating | 🟠 P2 | 3–5 days | High |
+| [23](#23--role-creation-level-ceiling) | Role creation level-ceiling | 🟠 P2 | 0.5–1 day | Low |
+| [24](#24--role-level-auto-calculation-from-permissions) | Role level auto-calculation from permissions | 🟠 P2 | 1–2 days | Medium |
+| [25](#25--indexeddb-client-storage-layer) | IndexedDB client storage layer | 🟠 P2 | 1–2 weeks | High |
 | [6](#6--deployed-subdomain-linkage) | Deployed subdomain linkage | 🟠 P2 | 2–3 days | Medium |
 | [7](#7--free-trial-support) | Free trial support | 🟠 P2 | 2–3 days | Medium |
 | [8](#8--stripe-customer-portal-self-service) | Stripe Customer Portal (self-service) | 🟠 P2 | 1–2 days | Low |
@@ -40,7 +44,7 @@
 | [14](#14--font-size-and-colour-palette-audit) | ~~Font, size and colour palette audit~~ | 🟡 P3 | 2–3 days | Medium |
 | [15](#15--hard-testing--all-surfaces) | Hard testing (all surfaces) | 🟡 P3 | 3–5 days | Medium |
 | [16](#16--full-automated-test-suite) | Full automated test suite | 🟢 P4 | 2–4 weeks | Very High |
-| [17](#17--owner-admin-page) | Owner admin page (CLI + SQL tools in UI) | 🟢 P4 | 2–3 days | Medium |
+| [17](#17--owner-admin-page) | ~~Owner admin page (CLI + SQL tools in UI)~~ | 🟢 P4 | 2–3 days | Medium |
 | [18](#18--migrate-github-pages-deployment-to-private-repo--alternative-host) | Migrate GitHub Pages to private repo + new host | 🟢 P4 | 1–2 days | Medium |
 | [19](#19--filter-pane-no-scroll--fully-visible) | ~~Filter pane: no scroll, always fully visible~~ | 🟡 P3 | 0.5 day | Low |
 | [20](#20--rename-app-title-to-personal-spending-pattern-visualisation-tool) | ~~Rename app title to "Personal Spending…"~~ | 🟡 P3 | 0.5 day | Low |
@@ -500,9 +504,102 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 
 ---
 
+## 22 — Admin panel security hardening
+
+**Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🔴 P1 &nbsp;·&nbsp; **Effort:** 1–2 weeks &nbsp;·&nbsp; **Complexity:** High  
+**Why before Stripe:** The admin panel is owner-facing infrastructure. It must be hardened before billing goes live — an unsecured admin panel with access to user accounts and subscription controls is a critical pre-launch risk.
+
+**What it involves:**
+- **IP whitelisting** — allowlist one or more IP ranges (or specific IPs) at the Flask level; requests not matching return 403 before any auth check. Config stored in env/DB so it can be updated without a redeploy. Admin panel only — not the main Cashflow API.
+- **Stronger bot detection** — rate limit by IP on auth endpoints (login, signup, password reset); add `X-Request-Id` tracking; consider HMAC request signing for admin API calls from the frontend; honeypot field already exists on login forms but add server-side verification.
+- **Malware / payload inspection** — validate all admin API inputs against unexpected patterns (oversized payloads, binary in text fields, path traversal in any string accepted as a name/identifier).
+- **XSS hardening** — `Content-Security-Policy` header on all admin responses; `X-Content-Type-Options: nosniff`; `X-Frame-Options: DENY`; all admin API responses already return JSON but explicitly set `Content-Type: application/json`.
+- **CSRF protection** — SameSite=Strict on admin session cookies; double-submit cookie pattern or CSRF token for all state-changing admin API calls.
+- **Injection hardening** — audit all admin routes for raw string interpolation in SQL (should all be parameterised already, but verify); same for any shell calls.
+- **Audit log** — all state-changing admin actions (role create/edit/delete, user reassign, category delete) already log to impersonation log; extend to cover all mutations with actor IP + timestamp.
+
+**What it touches:**  
+`tools/cashflow/API/routes/admin.py` · `tools/cashflow/API/backend.py` (headers, CORS, cookie config) · `tools/cashflow/API/rate_limits.py` · admin panel Nginx/Render config (if applicable)
+
+---
+
+## 23 — Role creation level-ceiling
+
+**Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🟠 P2 &nbsp;·&nbsp; **Effort:** 0.5–1 day &nbsp;·&nbsp; **Complexity:** Low  
+**Why:** The existing level-ceiling covers edit/delete/assign. Create is currently unrestricted — an admin-level user could create a role at or above owner level. This closes that gap to complete the hierarchy invariant.
+
+**The rule (same as edit/delete):** `new_role.level >= caller.level → 403`. The actor must be strictly higher than the role they're creating.
+
+**What it involves:**
+- **Backend** (`admin_create_role`): add `if role_level >= caller_level: return 403` before INSERT. Caller level retrieved via `get_user_role_and_permissions` (same helper used for edit/delete).
+- **Frontend** (`RolesScreen.jsx`): the "Create role" form's level input already has `maxLevel = caller.level - 1` applied to the edit modal — apply the same cap to the create form so the number field can't be set to `>= caller.level`. If the user is trying to save a level at or above, disable the Save button.
+- No migration needed — purely logic.
+
+**What it touches:**  
+`tools/cashflow/API/routes/admin.py` (create_role endpoint) · `admin/src/screens/General/RolesScreen.jsx` (create modal validation)
+
+---
+
+## 24 — Role level auto-calculation from permissions
+
+**Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🟠 P2 &nbsp;·&nbsp; **Effort:** 1–2 days &nbsp;·&nbsp; **Complexity:** Medium  
+**Why:** Manual level entry is error-prone and disconnected from what the role actually does. Level should express the access a role grants, and access is defined by its permissions — so level should derive from permissions, not be entered independently.
+
+**What it involves:**
+- Define a permission-to-weight mapping (e.g. `admin.panel.view = 50`, `admin.users.manage = 80`, `admin.roles.manage = 90`, `admin.billing.manage = 95`) — stored in a config table or constants file so it can be tuned without a code change.
+- `level = max(weight of assigned permissions)` — the highest-weight permission determines the floor. Level can optionally be overridden upward (for future-proofing) but never below the floor.
+- Remove the manual level number input from the create/edit role form in the admin panel UI.
+- Backend: recalculate level on every role create/update before INSERT/UPDATE.
+- Existing roles: one-time migration script recalculates their levels from current permission sets (or owner manually re-saves each role to trigger recalc).
+- Owner role is always `level = 100` (or max integer) regardless of permissions — hard-coded floor.
+
+**What it touches:**  
+`tools/cashflow/API/routes/admin.py` (create/edit role) · `admin/src/screens/General/RolesScreen.jsx` (remove level input, show calculated preview) · new `permissions_weights` config table or constants file
+
+---
+
+## 25 — IndexedDB client storage layer
+
+**Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🟠 P2 &nbsp;·&nbsp; **Effort:** 1–2 weeks &nbsp;·&nbsp; **Complexity:** High  
+**Why before Stripe:** Stripe checkout and subscription state benefit from robust client-side persistence. IndexedDB also gives native encryption — sensitive preference data and cached transaction records shouldn't sit in plaintext localStorage.
+
+**What it involves:**
+
+### Core store
+Replace `localStorage` and `sessionStorage` across the web app with a structured IndexedDB layer:
+- Object stores: `preferences`, `session`, `transactions_cache`, `categories_cache`
+- Wrapper library: thin custom hook / util (`useIDB`) — `get(store, key)`, `set(store, key, value)`, `delete(store, key)`, `clear(store)` — returns Promises; no raw IDB boilerplate in components.
+- **Transactions + rollback:** multi-key writes use IDB's native transaction; on error, transaction aborts and rolls back atomically. No partial writes.
+
+### Encryption
+- Use the **Web Crypto API** (`SubtleCrypto`) — natively available in all modern browsers, no library needed.
+- Derive a per-user key via `PBKDF2` from a combination of the user's JWT sub + a device secret (stored separately in a secure origin-scoped value). Key is derived at session start and held in memory only — never persisted.
+- Encrypt sensitive stores (`preferences`, `session`) at-rest using `AES-GCM`. Non-sensitive caches (`transactions_cache`, `categories_cache`) can be unencrypted for read performance.
+- On key derivation failure (corrupt device secret, cleared origin storage): gracefully fall back to re-fetching from server — no crash.
+
+### Auto-sync
+- All writes to `preferences` and `session` stores automatically enqueue a debounced server sync (existing 2s debounce pattern already used in `UserPreferencesContext`).
+- On network failure: writes queue locally; flush on next successful network contact.
+- On app open: IDB read is the fast path; server fetch runs in background and updates IDB if newer data arrives.
+
+### Fallback for aggressive client-side clearing
+Safari Private Browsing and some iOS/Android browser configurations may deny IDB writes or clear IDB aggressively. The existing localStorage-based framework must remain as a degraded-mode fallback:
+- Detect IDB availability at startup (`try { open IDB } catch { use localStorage fallback }`).
+- Fallback must be transparent — no UI change, just reduced persistence.
+- Encryption is skipped in fallback mode (localStorage can't be encrypted at-rest meaningfully).
+
+### What it touches
+`tools/cashflow/WebUI/src/appState/UserPreferencesContext.jsx` · `tools/cashflow/WebUI/src/appState/AuthContext.jsx` · all `localStorage.*` / `sessionStorage.*` call sites in `WebUI/src/` · new `tools/cashflow/WebUI/src/utils/idb.js` (wrapper) · new `tools/cashflow/WebUI/src/utils/crypto.js` (encryption helpers)
+
+---
+
 ## Dependency Order
 
 ```
+22 (Admin security hardening) ──► 3 (Stripe)    [security must be solid before billing goes live]
+23 (Role creation ceiling) ──► 24 (Level auto-calc)  [small, do together in one session]
+25 (IndexedDB) ──► 3 (Stripe)                    [client persistence needed before Stripe UX]
+
 1 (Auth isolation) ──► 5 (JWT gating) ──► 6 (Subdomain linkage)
                    ──► 3 (Stripe)     ──► 4 (Webhooks) ──► 7 (Trials)
                                                          ──► 8 (Portal)
@@ -539,3 +636,4 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 | 21 Sep 2026 | 🟢 Planning | ~19% | Full auth + platform architecture discussion. No code today — agreed design for email auth, SMTP email sending, email verification, password reset, Google + Microsoft OAuth, Stripe billing, profile UI, isolation audit, and monorepo platform structure. Design doc written: `context/auth-design.md`. Implementation begins next session. |
 | 23 Sep 2026 | 🟢 Progressing well | ~45% | Auth system fully shipped: email verification, forgot/reset password, failed-attempt lockout, account deletion with 48h grace + cancellation. Brevo HTTP API for transactional email (SMTP blocked on Render). Platform restructure: landing page live, Cashflow moved to `tools/cashflow/`, dual deploy workflows. Admin panel built and deployed (standalone Vite + React, HashRouter, GitHub Pages at `/utility-tools/admin/`): roles management, users management, category management, impersonation/deletion logs. Task 2 ✓, Task 17 ✓, Task 21 partially ✓ (OAuth still pending). |
 | 24 Sep 2026 | 🟢 Progressing well | ~50% | Admin panel hardening: level-ceiling enforcement on all manipulation endpoints — no exceptions, no owner bypass (actor must be STRICTLY higher than target before and after). Email CC matrix: scheduled/cancelled/permanent deletion emails To: actor CC: owner. `pending_deletion_by_email` stored at schedule time so cron can email actor 48h later. Cancel emails added for roles and categories. Removed redundant `PROTECTED_ROLE_NAMES` check. Fixed `_get_owner_email` wrong join (`user_roles` doesn't exist — schema uses `users.role_id`). Migration `add_pending_deletion_by_email.sql` run on Supabase. Priority reorder confirmed: Stripe billing (Tasks 3+4) next, then React Native (Task 10), then OAuth (lowest). |
+| 26 Sep 2026 | 🟢 Planning | ~50% | Task backlog expanded: added Tasks 22 (admin security hardening), 23 (role creation ceiling), 24 (role level auto-calc from permissions), 25 (IndexedDB client storage with encryption + fallback). Priority reorder: 22 → 3+4 (Stripe) → 23+24 → 25 → 5+6 → 10 (RN) → 21 (OAuth). Wakeup spinner also wired to login form submit on both landing and admin. |

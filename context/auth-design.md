@@ -268,4 +268,143 @@ Before any paying users, every DB query touching `transactions`, `categorized_re
 - Stripe tier model specifics: what does free tier allow vs paid per tool? Upload limits? Feature limits?
 - Trial length and whether card is required for trial
 - Whether existing Cashflow users are grandfathered in free or required to subscribe
+
+---
+
+## 11. Additional Platform Tasks (scoped 2026-09-26)
+
+These are scoped and queued — not yet in the implementation order above. They sit between the current completed work and the Stripe build.
+
+---
+
+### 11a. Admin Panel Security Hardening (Task 22)
+
+The admin panel is owner-facing infrastructure and must be hardened before billing goes live.
+
+**IP whitelisting**
+- Flask middleware checks `request.remote_addr` (with `ProxyFix` already applied) against an allowlist stored in env/DB.
+- Non-matching requests → 403 before any auth check.
+- Admin panel only — does not apply to the main Cashflow API.
+- Config: `ADMIN_IP_ALLOWLIST` env var (comma-separated CIDR ranges or IPs); empty = no restriction (dev mode).
+
+**Bot detection**
+- Rate limit by IP on all admin auth endpoints (existing `rate_limits.py` framework extended with `RL_ADMIN_AUTH_*` constants).
+- Honeypot fields already exist on login forms; add server-side enforcement — reject any request where the honeypot field is non-empty.
+- `X-Request-Id` header tracked in admin audit log for correlation.
+- Consider HMAC request signing: admin frontend generates a per-request signature (timestamp + body hash signed with a session-derived secret) — backend verifies. Prevents replayed or crafted API calls.
+
+**Payload / malware inspection**
+- Max payload size enforcement (`MAX_CONTENT_LENGTH` on Flask).
+- Input validation on all admin API string fields: role names, category names, user identifiers — reject null bytes, path-traversal patterns (`../`), oversized values.
+- Binary content rejected in text fields.
+
+**XSS / header hardening**
+- `Content-Security-Policy: default-src 'self'` on all admin API responses.
+- `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` added to all admin responses.
+- All admin responses already JSON; explicitly enforce `Content-Type: application/json`.
+
+**CSRF protection**
+- `SameSite=Strict` on the admin session JWT cookie.
+- Double-submit cookie pattern or per-session CSRF token for all state-changing admin API calls.
+
+**SQL injection audit**
+- All admin routes already use parameterised queries (psycopg2 `%s` style) — verify no raw string interpolation exists in admin.py, categories.py, or any helper.
+
+---
+
+### 11b. Role Creation Level-Ceiling (Task 23)
+
+The existing level-ceiling enforces `target_level >= caller_level → 403` on edit, delete, and assign. CREATE is currently unrestricted.
+
+**Rule:** `new_role.level >= caller.level → 403`. Actor must be strictly higher than the role they are creating.
+
+**Backend change** (`admin_create_role`):
+```python
+caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+if requested_level >= caller_level:
+    return jsonify({'error': f'Cannot create a role at or above your own level ({caller_level})'}), 403
+```
+
+**Frontend change** (`RolesScreen.jsx`):
+- Create modal: level field capped at `caller.level - 1` (same `maxLevel` already applied to edit modal).
+- Save button disabled if level input reaches or exceeds `caller.level`.
+
+---
+
+### 11c. Role Level Auto-Calculation from Permissions (Task 24)
+
+Manual level entry is disconnected from what a role actually grants. Level should be derived from the highest-weight permission assigned.
+
+**Permission weight map** (stored in a `permission_weights` config table or constants in `permissions.py`):
+
+| Permission | Weight |
+|---|---|
+| `admin.panel.view` | 50 |
+| `admin.users.view` | 60 |
+| `admin.users.manage` | 70 |
+| `admin.roles.view` | 75 |
+| `admin.roles.manage` | 85 |
+| `admin.billing.manage` | 90 |
+| `admin.impersonation` | 95 |
+| *(owner — hardcoded)* | 100 |
+
+**Calculation:** `level = max(weight for each assigned permission)`. If no permissions, level = 1.
+
+**Override rule:** level may be set higher than the calculated floor (for future-proofing) but never below it. Owner is always 100 regardless.
+
+**Backend:** recalculate on every role create/update before INSERT/UPDATE.
+
+**Frontend:** remove the manual level number input from create and edit forms. Show a read-only "Calculated level: X" preview that updates live as permissions are checked/unchecked.
+
+**Migration:** one-time script to recalculate existing roles from their current permission sets.
+
+---
+
+### 11d. IndexedDB Client Storage Layer (Task 25)
+
+Replace `localStorage`/`sessionStorage` with a structured, encrypted IndexedDB layer.
+
+**Object stores**
+| Store | Encrypted | Purpose |
+|---|---|---|
+| `session` | ✅ | JWT token, auth state |
+| `preferences` | ✅ | Column widths, stack order, theme |
+| `transactions_cache` | ❌ | Cached transaction rows (read perf) |
+| `categories_cache` | ❌ | Cached category list |
+
+**API wrapper** (`src/utils/idb.js`)
+```js
+idb.get(store, key)         // → Promise<value | null>
+idb.set(store, key, value)  // → Promise<void>  (uses IDB transaction internally)
+idb.delete(store, key)      // → Promise<void>
+idb.clear(store)            // → Promise<void>
+idb.transaction(fn)         // → Promise  — fn receives a tx, runs atomically, auto-rollback on throw
+```
+
+**Encryption** (`src/utils/crypto.js`)
+- Web Crypto API (`SubtleCrypto`) — no external library.
+- Key derivation: `PBKDF2(password = JWT sub + device_id, salt = origin-scoped random, iterations = 100k, hash = SHA-256)` → `AES-GCM` key.
+- `device_id` is a random UUID generated once and stored in a separate, non-encrypted IDB store (or a dedicated cookie with `HttpOnly=false` since it's not a secret, just a device fingerprint).
+- Key held in memory only (never stored). Derived at session start, cleared on logout.
+- On decryption failure → treat as cache miss → re-fetch from server.
+
+**Auto-sync**
+- Writes to `preferences` and `session` enqueue a debounced server sync (existing 2s debounce pattern in `UserPreferencesContext` extended to use IDB writes instead of `localStorage` writes).
+- Network failure → writes queue locally; flush on reconnect.
+- App open → IDB read first (fast path), server fetch runs in background and updates IDB if server data is newer (compare `updated_at` timestamps).
+
+**Fallback (Safari Private / aggressive clearing)**
+```js
+async function openIDB() {
+    try {
+        // attempt IDB open
+    } catch {
+        return null; // signal fallback mode
+    }
+}
+// All idb.* calls check for null and fall back to localStorage silently
+```
+- Encryption skipped in fallback mode.
+- No UI change — degraded persistence only.
+- Existing localStorage framework remains intact as the fallback layer; no removal until IDB is proven stable across all target browsers/devices.
 - Domain name (needed for OAuth redirect URIs and subdomain linkage)
