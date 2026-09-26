@@ -1,4 +1,5 @@
 <!-- last-verified: f366d81 2026-09-24 -->
+2026-09-26 | task: add soft-launch + hard-launch checklists to backlog | safe-point: b9fb3981cfb2a06b479d6747938074f134b165e9 | status: complete
 2026-09-24 | task: admin page startup spinner + progress bar | safe-point: f366d81008c03f0c85fdb97b1034a816a7c928c1 | status: complete
 2026-09-24 | task: wakeup spinner on login form submit (landing + admin) | safe-point: 75ce9be6d402fb8353b9a6d98c67d6150163bbfe | status: in-progress
 2026-09-24 | task: backlog update — check-in 1, task 17 done, daily log 23-24 Sep | safe-point: 7e498332e09247f8310211c3a0e5d70ece576022 | status: complete

@@ -719,6 +719,92 @@ Safari Private Browsing and some iOS/Android browser configurations may deny IDB
 
 ---
 
+---
+
+## 🚀 Soft Launch Checklist (LinkedIn / First Public Post)
+
+This checklist gates the first post to LinkedIn or any other public channel. Every item must be green before posting.
+
+### Security & Auth (must-have before any unknown users sign up)
+- [ ] **Task 27 shipped** — separate `admin_users` table; Cashflow credentials cannot reach admin panel
+- [ ] **Task 26 shipped** — admin has its own session cookies, never auto-logged in from landing page
+- [ ] **Task 22 shipped** — IP whitelisting, HMAC signing, CSP headers, CSRF, immutable audit log
+- [ ] **Task 1 shipped** — `tools` JWT claim in place, blueprint isolation confirmed, CORS locked to explicit origins
+- [ ] **Task 3 + 4 shipped** — Stripe billing + webhook listener live and tested end-to-end in Stripe test mode, then flipped to live keys
+- [ ] **Task 5 shipped** — per-tool JWT access gating enforced; 402 returned for non-subscribers
+- [ ] **`DEBUG=False` on Render** — no stack traces in API error responses
+- [ ] **`ALLOWED_ORIGINS` on Render** — only production frontend URLs, no localhost wildcard
+- [ ] **Email verification enforced** — users cannot access app features until email is verified (Task 3/4 dependency)
+- [ ] **All secrets rotated** — `JWT_SECRET_KEY`, `BREVO_API_KEY`, `STRIPE_*`, `CLEANUP_SECRET` — confirm none are in git history
+
+### Input Validation (protect against unknown users with unexpected inputs)
+- [ ] **Server-side file size cap** — CSV/Excel upload rejects files over a hard limit (e.g. 10MB) before parsing; enforced in Flask route, not just frontend
+- [ ] **Strict MIME type check** — backend validates `content_type` is CSV or Excel before passing to parser; reject everything else with 415
+- [ ] **No stack traces in upload errors** — all file parsing errors return a user-facing message, not a Python exception
+- [ ] **Disposable email blocking** — reject signups from known disposable email domains (e.g. mailinator, guerrillamail); small static blocklist in auth route is sufficient for soft launch
+
+### Privacy & Legal (users will ask before uploading bank data)
+- [ ] **Privacy page answers "where does my data go"** — explicitly states: data stored in Supabase (EU/US), not sold, not shared, deletable on request
+- [ ] **Data deletion path is clear** — user can delete their account (and all transaction data) from the app; flow tested end-to-end
+- [ ] **Terms of Service live** — no SaaS launch without ToS; existing `/terms` page is sufficient if it covers the key points (no liability for financial decisions, acceptable use, cancellation)
+- [ ] **Cookie banner** — if using any analytics or non-essential cookies, consent prompt must be present
+
+### Reliability (Render free tier under real load)
+- [ ] **Render hours budget checked** — free tier = 750h/month. At expected traffic, estimate whether you'll exceed it and have a plan (upgrade to paid $7/mo or accept downtime)
+- [ ] **Cold start UX confirmed** — wakeup spinner tested on a genuinely cold server; progress bar shows, login completes correctly after wakeup
+
+### Pre-post scan
+- [ ] **Run OWASP ZAP (free desktop tool) against production URL** — 1-hour scan, fix any HIGH severity findings before posting
+- [ ] **Enable Dependabot on GitHub** — repo Settings → Security → Dependabot alerts + security updates; takes 2 minutes, free
+- [ ] **Manual happy path test** — signup → email verify → login → upload CSV → categorise → manual review → charts → logout; all green on production URL (not localhost)
+
+### Nice-to-have before post (not blockers)
+- [ ] Task 6 — custom subdomain live (looks more professional than `render.com/...` or GitHub Pages URL)
+- [ ] Task 7 — free trial configured (users can try before paying; conversion is much lower without a trial)
+- [ ] Task 8 — Stripe Customer Portal linked ("Manage subscription" in account settings)
+- [ ] Task 10 — React Native up to date (if you mention mobile support in the post)
+
+---
+
+## 🏗️ Hard Launch Checklist (Full Public — Beyond LinkedIn Network)
+
+Hard launch means advertising to strangers: Product Hunt, tech communities, paid ads, being featured somewhere. Volume and intent are unknown. Everything from the soft launch checklist still applies, plus:
+
+### Infrastructure scale
+- [ ] **Upgrade Render to paid tier** (at minimum $7/mo Starter) — no 750h cap, no cold starts; critical once you're paying for traffic
+- [ ] **Supabase plan reviewed** — free tier has row limits and connection limits; at real user scale you'll need Pro
+- [ ] **CDN / static asset caching** — landing page and admin panel are GitHub Pages (already CDN-served); make sure Cashflow WebUI static assets are also served with cache headers, not direct from Render
+
+### Abuse at scale
+- [ ] **Rate limit on signup endpoint tightened** — soft launch rate limits are IP-based; at public scale you want per-email-domain throttling too
+- [ ] **Trial abuse guard** — one free trial per verified email address (task 7 spec); enforce it before hard launch or you'll get scrapers exhausting trial credits
+- [ ] **File upload abuse guard** — per-user daily upload limit (e.g. 20 files/day) enforced server-side; prevents someone using the app as a free CSV processing service
+
+### Discovery & SEO
+- [ ] **robots.txt** — block `/admin`, `/auth`, and API paths; allow landing page and marketing pages
+- [ ] **Meta tags on landing page** — `og:title`, `og:description`, `og:image` for link preview on social shares; without these the LinkedIn/Twitter unfurl looks broken
+- [ ] **Google Search Console** — submit the landing page sitemap so the site is indexable; takes 10 minutes
+- [ ] **Analytics** — at least basic page-view tracking (Plausible is privacy-respecting and free-tier; Fathom, Umami, or Vercel Analytics also work) so you know where traffic comes from and where users drop off
+
+### Payments & Legal
+- [ ] **Stripe live keys** — flip from test to live keys in Render env vars; re-test checkout end-to-end on live keys before publishing
+- [ ] **Stripe webhook verified on live endpoint** — `stripe.Webhook.construct_event` must validate against the live webhook secret, not the test secret
+- [ ] **Refund policy in ToS** — Stripe requires a clear refund policy in your ToS before you can enable live payments; add a one-paragraph refund policy to `/terms`
+- [ ] **VAT / tax obligations checked** — if selling to EU customers, you may need to collect and remit VAT. Stripe Tax can handle this automatically; enable it before hard launch
+
+### Monitoring (you need to know when something breaks)
+- [ ] **Render alerts** — set up email/Slack notification for deploy failures and error spikes (available in Render dashboard)
+- [ ] **Uptime monitoring** — free tier of BetterUptime, UptimeRobot, or similar; pings your API every 5 minutes and emails you if it goes down
+- [ ] **Sentry or similar error tracking** — install in both Flask backend and React frontend; runtime exceptions become emails, not silent failures you discover a week later
+- [ ] **Supabase DB size monitoring** — know when you're approaching the free tier row/storage limit before hitting it
+
+### Operational readiness
+- [ ] **Incident runbook exists** — a short doc (can live in `context/`) answering: what do I do if the DB is down? If Render is down? If a user reports data loss? If a payment double-charges?
+- [ ] **Support channel** — even a simple "contact@yourdomain.com" address that you check; users will email it regardless of whether it's listed
+- [ ] **Backup confirmed** — Supabase has point-in-time restore on Pro; on free tier, set up a manual export cron or at minimum know how to restore from a Supabase snapshot
+
+---
+
 ## 📅 Daily Progress Log
 
 | Date | Status | Overall % | Note |
@@ -729,3 +815,4 @@ Safari Private Browsing and some iOS/Android browser configurations may deny IDB
 | 23 Sep 2026 | 🟢 Progressing well | ~45% | Auth system fully shipped: email verification, forgot/reset password, failed-attempt lockout, account deletion with 48h grace + cancellation. Brevo HTTP API for transactional email (SMTP blocked on Render). Platform restructure: landing page live, Cashflow moved to `tools/cashflow/`, dual deploy workflows. Admin panel built and deployed (standalone Vite + React, HashRouter, GitHub Pages at `/utility-tools/admin/`): roles management, users management, category management, impersonation/deletion logs. Task 2 ✓, Task 17 ✓, Task 21 partially ✓ (OAuth still pending). |
 | 24 Sep 2026 | 🟢 Progressing well | ~50% | Admin panel hardening: level-ceiling enforcement on all manipulation endpoints — no exceptions, no owner bypass (actor must be STRICTLY higher than target before and after). Email CC matrix: scheduled/cancelled/permanent deletion emails To: actor CC: owner. `pending_deletion_by_email` stored at schedule time so cron can email actor 48h later. Cancel emails added for roles and categories. Removed redundant `PROTECTED_ROLE_NAMES` check. Fixed `_get_owner_email` wrong join (`user_roles` doesn't exist — schema uses `users.role_id`). Migration `add_pending_deletion_by_email.sql` run on Supabase. Priority reorder confirmed: Stripe billing (Tasks 3+4) next, then React Native (Task 10), then OAuth (lowest). |
 | 26 Sep 2026 | 🟢 Planning | ~50% | Task backlog expanded: added Tasks 22 (admin security hardening), 23 (role creation ceiling), 24 (role level auto-calc from permissions), 25 (IndexedDB client storage with encryption + fallback). Priority reorder: 22 → 3+4 (Stripe) → 23+24 → 25 → 5+6 → 10 (RN) → 21 (OAuth). Wakeup spinner also wired to login form submit on both landing and admin. |
+| 26 Sep 2026 | 🟢 Planning | ~50% | Added Soft Launch checklist (LinkedIn post gate) and Hard Launch checklist (full public / Product Hunt / ads) to backlog. Soft launch gates: Tasks 27+26+22+1+3+4+5 shipped, DEBUG=False, file validation, privacy page, ZAP scan, Dependabot. Hard launch adds: Render paid tier, Sentry, uptime monitoring, analytics, SEO meta tags, Stripe live keys + tax, incident runbook. |
