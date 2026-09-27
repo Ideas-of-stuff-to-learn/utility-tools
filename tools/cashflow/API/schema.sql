@@ -388,3 +388,38 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS login_locked_until TIMESTAMPTZ;
 INSERT INTO permissions (key, description) VALUES
     ('email.bypass_ratelimit', 'Bypass email send rate limits and daily cap — owner/testing use')
 ON CONFLICT (key) DO NOTHING;
+
+-- =====================================================================
+-- Admin credential isolation (Task 27, 2026-09-26)
+-- admin_users is a completely separate identity space from users.
+-- Cashflow credentials cannot reach admin panel routes.
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS admin_users (
+    id               SERIAL PRIMARY KEY,
+    username         TEXT UNIQUE NOT NULL,
+    password_hash    TEXT NOT NULL,
+    totp_secret      TEXT,
+    totp_enrolled    BOOLEAN NOT NULL DEFAULT false,
+    role_id          INTEGER REFERENCES roles(id),
+    created_by       INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_login_at    TIMESTAMPTZ,
+    login_locked     BOOLEAN NOT NULL DEFAULT false,
+    failed_attempts  INTEGER NOT NULL DEFAULT 0,
+    locked_until     TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS admin_login_log (
+    id              SERIAL PRIMARY KEY,
+    admin_user_id   INTEGER REFERENCES admin_users(id) ON DELETE CASCADE,
+    ip              TEXT,
+    user_agent      TEXT,
+    outcome         TEXT NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_admin_login_log_created_at ON admin_login_log (created_at);
+CREATE INDEX IF NOT EXISTS idx_admin_login_log_admin_user_id ON admin_login_log (admin_user_id);
+
+-- Allow impersonation_log to record admin-panel actors separately
+ALTER TABLE impersonation_log ALTER COLUMN actor_user_id DROP NOT NULL;
+ALTER TABLE impersonation_log ADD COLUMN IF NOT EXISTS actor_admin_user_id INTEGER REFERENCES admin_users(id) ON DELETE SET NULL;

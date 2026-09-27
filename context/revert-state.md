@@ -1,4 +1,7 @@
 <!-- last-verified: f366d81 2026-09-24 -->
+2026-09-27 | task: permission-derived role levels + ADMIN_LEVEL_OVERRIDE_MIN | safe-point: 10f3bf4f0e00b836ebe0b9fc8542f1d0c2596e4e | status: in-progress
+2026-09-27 | task: add start-dev.bat for unified local dev startup | safe-point: 10f3bf4f0e00b836ebe0b9fc8542f1d0c2596e4e | status: complete
+2026-09-26 | task: Tasks 27+26+23 — admin credential isolation, session isolation, role ceiling | safe-point: 10f3bf4f0e00b836ebe0b9fc8542f1d0c2596e4e | status: complete
 2026-09-26 | task: add soft-launch + hard-launch checklists to backlog | safe-point: b9fb3981cfb2a06b479d6747938074f134b165e9 | status: complete
 2026-09-24 | task: admin page startup spinner + progress bar | safe-point: f366d81008c03f0c85fdb97b1034a816a7c928c1 | status: complete
 2026-09-24 | task: wakeup spinner on login form submit (landing + admin) | safe-point: 75ce9be6d402fb8353b9a6d98c67d6150163bbfe | status: in-progress

@@ -7,24 +7,27 @@ gated by its own specific permission key via require_permission() (see
 permissions.py) - there is no single "is_admin" shortcut anywhere here,
 same convention as routes/categories.py.
 """
-import os
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from datetime import timezone
 
-from flask import request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token, decode_token
+from flask import request, jsonify, g
+from flask_jwt_extended import create_access_token, decode_token
 import bcrypt
 
 from extensions import app, limiter, IMPERSONATION_TOKEN_EXPIRES
 from rate_limits import RL_READ_ADMIN, RL_CATEGORY_WRITE, RL_ADMIN_SENSITIVE, RL_ADMIN_UNLOCK, RL_ADMIN_USER_TRANSACTIONS
 from database import get_connection, release_connection
 from permissions import (
-    require_permission, get_user_role_and_permissions,
+    require_admin_auth, get_admin_role_and_permissions,
     list_all_permissions, list_all_roles, list_all_users,
     get_role_by_name, create_role, update_role, delete_role,
     assign_user_role, set_user_permission_override,
     get_user_level, delete_user, update_user_credentials,
 )
 from email_service import send_email
+from permission_weights import compute_role_level
+from backendLocalConfig import ADMIN_LEVEL_OVERRIDE_MIN
 
 _CLEANUP_SECRET = os.environ.get('CLEANUP_SECRET', '')
 
@@ -42,10 +45,12 @@ def _get_owner_email(conn):
     return row[0] if row else None
 
 
-def _get_caller_email(conn, user_id):
+def _get_caller_email(conn, admin_user_id):
+    """Returns the email of an admin_users account (may be NULL if not set)."""
     with conn.cursor() as cur:
-        cur.execute("SELECT email FROM users WHERE id = %s", (user_id,))
+        cur.execute("SELECT username FROM admin_users WHERE id = %s", (admin_user_id,))
         row = cur.fetchone()
+    # admin_users has no email column yet; fall back to username for notifications
     return row[0] if row else None
 
 
@@ -103,8 +108,7 @@ def _send_deletion_confirmed_email(actor_email, owner_email, item_type, item_nam
 
 
 @app.route('/admin/permissions', methods=['GET'])
-@jwt_required()
-@require_permission('roles.view')
+@require_admin_auth('roles.view')
 @limiter.limit(RL_READ_ADMIN)
 def admin_list_permissions():
     """The master list of every permission key that exists - what
@@ -120,14 +124,13 @@ def admin_list_permissions():
 
 
 @app.route('/admin/roles', methods=['GET'])
-@jwt_required()
-@require_permission('roles.view')
+@require_admin_auth('roles.view')
 @limiter.limit(RL_READ_ADMIN)
 def admin_list_roles():
-    current_user = int(get_jwt_identity())
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
-        caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         roles = list_all_roles(conn)
         if caller_role != 'owner':
             roles = [r for r in roles if r['level'] < caller_level]
@@ -140,8 +143,7 @@ def admin_list_roles():
 
 
 @app.route('/admin/roles', methods=['POST'])
-@jwt_required()
-@require_permission('roles.manage')
+@require_admin_auth('roles.manage')
 @limiter.limit(RL_CATEGORY_WRITE)
 def admin_create_role():
     """Creates a new custom role. The caller's own level acts as a
@@ -161,12 +163,23 @@ def admin_create_role():
     if not isinstance(permission_keys, list):
         return jsonify({'error': 'permissions must be a list of keys'}), 400
 
-    current_user = int(get_jwt_identity())
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
-        caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
-        if caller_role != 'owner' and level >= caller_level:
-            return jsonify({'error': f'Cannot create a role at or above your own level ({caller_level})'}), 403
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
+        computed_level = compute_role_level(permission_keys)
+        can_override = caller_role == 'owner' or caller_level >= ADMIN_LEVEL_OVERRIDE_MIN
+        if can_override and level is not None:
+            # Senior admin provided a manual override — validate it
+            if level >= caller_level:
+                return jsonify({'error': f'Cannot create a role at or above your own level ({caller_level})'}), 403
+        else:
+            # Level must equal the formula result
+            if level != computed_level:
+                return jsonify({'error': f'Level must equal the permission-derived value ({computed_level})'}), 403
+            if computed_level >= caller_level:
+                return jsonify({'error': f'Cannot create a role at or above your own level ({caller_level})'}), 403
+            level = computed_level
 
         role = create_role(conn, name, level, permission_keys)
         conn.commit()
@@ -183,8 +196,7 @@ def admin_create_role():
 
 
 @app.route('/admin/roles/<int:role_id>', methods=['PATCH'])
-@jwt_required()
-@require_permission('roles.manage')
+@require_admin_auth('roles.manage')
 @limiter.limit(RL_CATEGORY_WRITE)
 def admin_update_role(role_id):
     """Edits a role's level and/or permission bundle (permissions, if
@@ -199,14 +211,30 @@ def admin_update_role(role_id):
     if permission_keys is not None and not isinstance(permission_keys, list):
         return jsonify({'error': 'permissions must be a list of keys'}), 400
 
-    current_user = int(get_jwt_identity())
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
-        caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
-        if level is not None:
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
+        can_override = caller_role == 'owner' or caller_level >= ADMIN_LEVEL_OVERRIDE_MIN
+        if permission_keys is not None:
+            computed_level = compute_role_level(permission_keys)
+            if can_override and level is not None:
+                if not isinstance(level, int):
+                    return jsonify({'error': 'level must be an integer'}), 400
+                if level >= caller_level:
+                    return jsonify({'error': f'Cannot set a role to your level or above ({caller_level})'}), 403
+            else:
+                if level is not None and level != computed_level:
+                    return jsonify({'error': f'Level must equal the permission-derived value ({computed_level})'}), 403
+                if computed_level >= caller_level:
+                    return jsonify({'error': f'Cannot set a role to your level or above ({caller_level})'}), 403
+                level = computed_level
+        elif level is not None:
             if not isinstance(level, int):
                 return jsonify({'error': 'level must be an integer'}), 400
-            if caller_role != 'owner' and level >= caller_level:
+            if not can_override:
+                return jsonify({'error': 'Cannot change level without also submitting permissions'}), 403
+            if level >= caller_level:
                 return jsonify({'error': f'Cannot set a role to your level or above ({caller_level})'}), 403
 
         role = update_role(conn, role_id, level=level, permission_keys=permission_keys)
@@ -224,17 +252,16 @@ def admin_update_role(role_id):
 
 
 @app.route('/admin/roles/<int:role_id>', methods=['DELETE'])
-@jwt_required()
-@require_permission('roles.manage')
+@require_admin_auth('roles.manage')
 @limiter.limit(RL_CATEGORY_WRITE)
 def admin_delete_role(role_id):
     """Soft-delete: marks the role for deletion after a 48-hour grace period."""
     from datetime import datetime
-    current_user = int(get_jwt_identity())
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
         from permissions import get_role_by_id
-        caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         role = get_role_by_id(conn, role_id)
         if not role:
             return jsonify({'error': 'Role not found'}), 404
@@ -268,15 +295,14 @@ def admin_delete_role(role_id):
 
 
 @app.route('/admin/roles/<int:role_id>/cancel-delete', methods=['POST'])
-@jwt_required()
-@require_permission('roles.manage')
+@require_admin_auth('roles.manage')
 @limiter.limit(RL_CATEGORY_WRITE)
 def admin_cancel_delete_role(role_id):
-    current_user = int(get_jwt_identity())
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
         from permissions import get_role_by_id
-        caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         role = get_role_by_id(conn, role_id)
         if not role:
             return jsonify({'error': 'Role not found'}), 404
@@ -419,14 +445,13 @@ def process_pending_deletions():
 
 
 @app.route('/admin/users', methods=['GET'])
-@jwt_required()
-@require_permission('users.view')
+@require_admin_auth('users.view')
 @limiter.limit(RL_READ_ADMIN)
 def admin_list_users():
-    current_user = int(get_jwt_identity())
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
-        _caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+        _caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         users = list_all_users(conn)
         users = [u for u in users if u['level'] < caller_level]
         return jsonify({'users': users}), 200
@@ -438,8 +463,7 @@ def admin_list_users():
 
 
 @app.route('/admin/users/<int:target_user_id>/role', methods=['PATCH'])
-@jwt_required()
-@require_permission('users.assign_role')
+@require_admin_auth('users.assign_role')
 @limiter.limit(RL_CATEGORY_WRITE)
 def admin_assign_role(target_user_id):
     """Assigns a role to another user, by role name. Same level-ceiling
@@ -458,10 +482,10 @@ def admin_assign_role(target_user_id):
     if not role_name:
         return jsonify({'error': 'role is required'}), 400
 
-    current_user = int(get_jwt_identity())
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
-        caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         target_user = get_user_level(conn, target_user_id)
         if not target_user:
             return jsonify({'error': 'User not found'}), 404
@@ -488,8 +512,7 @@ def admin_assign_role(target_user_id):
 
 
 @app.route('/admin/users/<int:target_user_id>/permissions', methods=['PATCH'])
-@jwt_required()
-@require_permission('users.manage_permissions')
+@require_admin_auth('users.manage_permissions')
 @limiter.limit(RL_CATEGORY_WRITE)
 def admin_set_permission_override(target_user_id):
     """Grants, revokes, or clears ONE individual permission override for
@@ -508,10 +531,10 @@ def admin_set_permission_override(target_user_id):
     if granted is not None and not isinstance(granted, bool):
         return jsonify({'error': 'granted must be true, false, or omitted/null'}), 400
 
-    current_user = int(get_jwt_identity())
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
-        caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
 
         # Level ceiling on the target user
         target = get_user_level(conn, target_user_id)
@@ -560,8 +583,7 @@ def admin_set_permission_override(target_user_id):
 # than owner-only, unlike users.view/assign_role/manage_permissions
 # and roles.* above.
 @app.route('/admin/users', methods=['POST'])
-@jwt_required()
-@require_permission('users.create')
+@require_admin_auth('users.create')
 @limiter.limit(RL_CATEGORY_WRITE)
 def admin_create_user():
     """Creates a new user account directly, as an elevated action -
@@ -598,33 +620,17 @@ def admin_create_user():
 
 
 @app.route('/admin/users/<int:target_user_id>', methods=['DELETE'])
-@jwt_required(fresh=True)
-@require_permission('users.delete')
+@require_admin_auth('users.delete')
 @limiter.limit(RL_CATEGORY_WRITE)
 def admin_delete_user(target_user_id):
-    """Deletes a user account outright - CASCADES to their
-    transactions, uploaded_files, personal category_records, and any
-    user_permission_overrides row for them (see schema.sql's
-    ON DELETE CASCADE foreign keys). No soft-delete or undo.
-
-    Requires a FRESH token - see admin_impersonate_user()'s docstring
-    for the full reasoning; same principle applies here, arguably more
-    so given this is irreversible.
-
-    Same level-ceiling guard as role assignment: cannot delete a user
-    at or above your own level, unless you're the owner. Also refuses
-    to let anyone delete their OWN account through this endpoint -
-    there's no upside to allowing that here versus the real risk of an
-    unrecoverable mistake locking someone out of their only elevated
-    account.
+    """Deletes a Cashflow user account. Admin panel actors are from a
+    separate admin_users table so the self-delete check is not needed here.
+    Same level-ceiling guard as role assignment.
     """
-    current_user = int(get_jwt_identity())
-    if target_user_id == current_user:
-        return jsonify({'error': 'Cannot delete your own account through this endpoint'}), 400
-
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
-        caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         target = get_user_level(conn, target_user_id)
         if not target:
             return jsonify({'error': 'User not found'}), 404
@@ -646,20 +652,10 @@ def admin_delete_user(target_user_id):
 
 
 @app.route('/admin/users/<int:target_user_id>/credentials', methods=['PATCH'])
-@jwt_required(fresh=True)
-@require_permission('users.edit')
+@require_admin_auth('users.edit')
 @limiter.limit(RL_CATEGORY_WRITE)
 def admin_edit_user_credentials(target_user_id):
-    """Changes a user's username and/or password - at least one of the
-    two must be given, the other is left untouched. New values go
-    through the same validate_username()/validate_password() rules as
-    signup. Same level-ceiling guard as delete/impersonate: cannot edit
-    a user at or above your own level unless you're the owner -
-    otherwise a level-50 admin with users.edit could take over the
-    owner's account by simply setting a password they know. Requires a
-    FRESH token for the same reason - see admin_impersonate_user()'s
-    docstring for the full explanation.
-    """
+    """Changes a Cashflow user's username and/or password."""
     data = request.get_json() or {}
     new_username = data.get('username')
     new_password = data.get('password')
@@ -677,10 +673,10 @@ def admin_edit_user_credentials(target_user_id):
         if error:
             return jsonify({'error': error}), 400
 
-    current_user = int(get_jwt_identity())
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
-        caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         target = get_user_level(conn, target_user_id)
         if not target:
             return jsonify({'error': 'User not found'}), 404
@@ -709,38 +705,16 @@ def admin_edit_user_credentials(target_user_id):
 
 
 @app.route('/admin/users/<int:target_user_id>/impersonate', methods=['POST'])
-@jwt_required(fresh=True)
-@require_permission('users.impersonate')
+@require_admin_auth('users.impersonate')
 @limiter.limit(RL_CATEGORY_WRITE)
 def admin_impersonate_user(target_user_id):
-    """Issues a fresh, fully valid access token for another user's
-    account, without needing or ever seeing their password - "log in
-    as them." Same level-ceiling guard as delete/edit: cannot
-    impersonate a user at or above your own level, unless you're the
-    owner.
-
-    Requires a FRESH token (@jwt_required(fresh=True)) - the caller
-    must have just logged in with their actual password (a token
-    obtained via /auth/refresh is never fresh, see refresh() above),
-    not merely be carrying an old-but-still-technically-valid access
-    token. This specifically closes the "a leaked or ambient token can
-    silently trigger impersonation" risk: a stolen access token alone
-    is not enough, regardless of what client sends the request -
-    whoever calls this must have entered a real password recently.
-
-    Deliberately short-lived (IMPERSONATION_TOKEN_EXPIRES, currently 15
-    minutes, top of this file) rather than the normal 24h access token
-    expiry - an impersonation session is a bounded admin task, not
-    something that should be able to linger for a full day. Every call
-    here is also logged to impersonation_log (actor, target, jti, when)
-    - see handoff5.txt for why an audit trail mattered enough to add,
-    and can be individually revoked early via POST /admin/tokens/revoke
-    using the jti returned below, without waiting out its expiry.
+    """Issues a short-lived access token for a Cashflow user account —
+    logged to impersonation_log with actor_admin_user_id.
     """
-    current_user = int(get_jwt_identity())
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
-        caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         target = get_user_level(conn, target_user_id)
         if not target:
             return jsonify({'error': 'User not found'}), 404
@@ -756,7 +730,7 @@ def admin_impersonate_user(target_user_id):
 
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO impersonation_log (actor_user_id, target_user_id, jti) VALUES (%s, %s, %s)",
+                "INSERT INTO impersonation_log (actor_admin_user_id, target_user_id, jti) VALUES (%s, %s, %s)",
                 (current_user, target_user_id, jti),
             )
         conn.commit()
@@ -776,45 +750,38 @@ def admin_impersonate_user(target_user_id):
 
 
 @app.route('/admin/impersonation-log', methods=['GET'])
-@jwt_required()
-@require_permission('audit.view')
+@require_admin_auth('audit.view')
 @limiter.limit(RL_READ_ADMIN)
 def admin_impersonation_log():
-    """Read-only audit trail of every impersonation ever performed -
-    who (actor), whom (target), which token (jti - usable with
-    /admin/tokens/revoke below), and when. Gated by its own 'audit.view'
-    permission, separate from users.impersonate itself and NOT bundled
-    into the 'admin' role by default (see schema.sql) - being ALLOWED
-    to impersonate doesn't mean you should also see everyone else's
-    impersonation history. Doesn't prevent misuse by itself, but turns
-    "we have no way to know if this happened" into "we can check" -
-    see handoff5.txt.
-    """
-    current_user = int(get_jwt_identity())
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
-        caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         with conn.cursor() as cur:
             if caller_role == 'owner':
                 cur.execute(
-                    """SELECT il.id, ua.username, ut.username, il.jti, il.created_at
+                    """SELECT il.id,
+                              COALESCE(au.username, 'unknown') as actor,
+                              ut.username, il.jti, il.created_at
                        FROM impersonation_log il
-                       JOIN users ua ON il.actor_user_id = ua.id
+                       LEFT JOIN admin_users au ON il.actor_admin_user_id = au.id
+                       LEFT JOIN users ua ON il.actor_user_id = ua.id
                        JOIN users ut ON il.target_user_id = ut.id
                        ORDER BY il.created_at DESC""",
                 )
             else:
-                # Only show entries where both actor and target are below caller's level
                 cur.execute(
-                    """SELECT il.id, ua.username, ut.username, il.jti, il.created_at
+                    """SELECT il.id,
+                              COALESCE(au.username, 'unknown') as actor,
+                              ut.username, il.jti, il.created_at
                        FROM impersonation_log il
-                       JOIN users ua ON il.actor_user_id = ua.id
+                       LEFT JOIN admin_users au ON il.actor_admin_user_id = au.id
+                       LEFT JOIN users ua ON il.actor_user_id = ua.id
                        JOIN users ut ON il.target_user_id = ut.id
-                       JOIN roles ra ON ua.role_id = ra.id
                        JOIN roles rt ON ut.role_id = rt.id
-                       WHERE ra.level < %s AND rt.level < %s
+                       WHERE rt.level < %s
                        ORDER BY il.created_at DESC""",
-                    (caller_level, caller_level),
+                    (caller_level,),
                 )
             rows = cur.fetchall()
 
@@ -837,8 +804,7 @@ def admin_impersonation_log():
 
 
 @app.route('/admin/tokens/revoke', methods=['POST'])
-@jwt_required()
-@require_permission('users.impersonate')
+@require_admin_auth('users.impersonate')
 @limiter.limit(RL_ADMIN_SENSITIVE)
 def admin_revoke_token():
     """Revokes one specific token by its jti - lets an admin end an
@@ -878,14 +844,10 @@ def admin_revoke_token():
 
 
 @app.route('/admin/users/<int:target_user_id>/transactions', methods=['GET'])
-@jwt_required()
-@require_permission('users.view')
+@require_admin_auth('users.view')
 @limiter.limit(RL_ADMIN_USER_TRANSACTIONS)
 def admin_get_user_transactions(target_user_id):
-    """Returns all transactions for any user, for admin inspection.
-    Gated by users.view — same permission that already lets an admin
-    list all users. Supports ?offset=N&limit=N pagination identical to
-    GET /transactions."""
+    """Returns all transactions for any user, for admin inspection."""
     raw_offset = request.args.get('offset')
     raw_limit = request.args.get('limit')
     paginated = raw_limit is not None
@@ -896,10 +858,10 @@ def admin_get_user_transactions(target_user_id):
     except (TypeError, ValueError):
         return jsonify({'error': 'offset and limit must be integers'}), 400
 
-    current_user = int(get_jwt_identity())
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
-        _caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+        _caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         target = get_user_level(conn, target_user_id)
         if not target:
             return jsonify({'error': 'User not found'}), 404
@@ -946,24 +908,14 @@ def admin_get_user_transactions(target_user_id):
 
 
 @app.route('/admin/users/<int:target_user_id>/unlock', methods=['POST'])
-@jwt_required()
-@require_permission('users.unlock')
+@require_admin_auth('users.unlock')
 @limiter.limit(RL_ADMIN_UNLOCK)
 def admin_unlock_user(target_user_id):
-    """Clears login lockout and email rate-limit state for a user.
-
-    Resets: failed_login_attempts, login_locked_until, login_locked,
-    email_daily_count, last_email_sent_at. The user's limits still apply
-    normally after unlock — this only clears the accumulated counters,
-    not the limits themselves. Only owner bypasses limits permanently
-    (via email.bypass_ratelimit and the owner hard-ceiling in permissions.py).
-
-    Requires: users.unlock permission (admin role and above by default).
-    """
-    current_user = int(get_jwt_identity())
+    """Clears login lockout and email rate-limit state for a Cashflow user."""
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
-        _caller_role, caller_level, _perms = get_user_role_and_permissions(conn, current_user)
+        _caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         target = get_user_level(conn, target_user_id)
         if not target:
             return jsonify({'error': 'User not found'}), 404

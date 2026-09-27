@@ -19,8 +19,8 @@ and for the seed data / one-time backfill.
 
 from functools import wraps
 
-from flask import jsonify
-from flask_jwt_extended import get_jwt_identity
+from flask import jsonify, request, g
+from flask_jwt_extended import get_jwt_identity, decode_token
 
 from database import get_connection, release_connection
 
@@ -430,5 +430,100 @@ def set_user_permission_override(conn, target_user_id, permission_key, granted):
                    ON CONFLICT (user_id, permission_id) DO UPDATE SET granted = EXCLUDED.granted""",
                 (target_user_id, permission_id, granted),
             )
+
+
+# =====================================================================
+# Admin-panel auth helpers (Task 27 — admin_users table is separate
+# from the main users table; admin sessions use a different cookie).
+# =====================================================================
+
+def get_admin_role_and_permissions(conn, admin_user_id):
+    """Like get_user_role_and_permissions but queries admin_users.
+    Admin accounts have role-level permissions only (no per-user
+    overrides — keep the admin permission model simple)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT r.name, r.level
+               FROM admin_users au JOIN roles r ON au.role_id = r.id
+               WHERE au.id = %s""",
+            (admin_user_id,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return 'user', 0, set()
+    role_name, level = row
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT p.key FROM role_permissions rp
+               JOIN permissions p ON rp.permission_id = p.id
+               JOIN admin_users au ON au.role_id = rp.role_id
+               WHERE au.id = %s""",
+            (admin_user_id,),
+        )
+        perms = {r[0] for r in cur.fetchall()}
+
+    return role_name, level, perms
+
+
+def admin_user_has_permission(conn, admin_user_id, permission_key):
+    role_name, _level, perms = get_admin_role_and_permissions(conn, admin_user_id)
+    if role_name == OWNER_ROLE_NAME:
+        return True
+    return permission_key in perms
+
+
+_ADMIN_LOCKOUT_MINUTES = 15
+_ADMIN_PERM_LOCK_SENTINEL = '9999-01-01 00:00:00+00'
+
+
+def require_admin_auth(permission_key=None):
+    """Decorator for admin panel routes.
+
+    Reads and validates the admin_access_token cookie (issued only by
+    /admin/auth/login — never by regular /auth/login), checks the
+    admin_session claim, verifies the token is not revoked, then
+    optionally checks a permission key against admin_users.
+
+    Sets g.admin_user_id so the wrapped function can use it directly
+    instead of calling get_jwt_identity().
+    """
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            token = request.cookies.get('admin_access_token')
+            if not token:
+                return jsonify({'error': 'Admin session required'}), 401
+            try:
+                data = decode_token(token)
+            except Exception:
+                return jsonify({'error': 'Admin session invalid or expired'}), 401
+
+            if not data.get('admin_session'):
+                return jsonify({'error': 'Admin session required'}), 401
+
+            jti = data.get('jti')
+            admin_user_id = int(data['sub'])
+
+            conn = get_connection()
+            try:
+                # Revocation check
+                if jti:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT 1 FROM revoked_tokens WHERE jti = %s", (jti,))
+                        if cur.fetchone():
+                            return jsonify({'error': 'Session revoked'}), 401
+
+                # Permission check
+                if permission_key and not admin_user_has_permission(conn, admin_user_id, permission_key):
+                    return jsonify({'error': 'Not authorized'}), 403
+            finally:
+                release_connection(conn)
+
+            g.admin_user_id = admin_user_id
+            g.admin_token_jti = jti
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
 
     return next(u for u in list_all_users(conn) if u['id'] == target_user_id)

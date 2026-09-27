@@ -113,7 +113,7 @@ export default function UnlockScreen() {
                                                     {unlocking === u.id ? 'Unlocking…' : 'Unlock'}
                                                 </button>
                                             ) : (
-                                                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
+                                                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>N/A</span>
                                             )}
                                         </td>
                                     </tr>

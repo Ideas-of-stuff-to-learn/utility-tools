@@ -1,6 +1,6 @@
 const BASE_URL = import.meta.env.PROD
     ? 'https://cashflow2-0.onrender.com'
-    : `http://${import.meta.env.VITE_LOCAL_IP || 'localhost'}:5000`;
+    : `http://${import.meta.env.VITE_LOCAL_IP || 'localhost'}:${import.meta.env.VITE_BACKEND_PORT || '5050'}`;
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 110000;
 const COLD_START_TIMEOUT_MS = 70000;

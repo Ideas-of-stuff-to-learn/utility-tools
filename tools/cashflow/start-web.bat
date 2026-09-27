@@ -26,10 +26,13 @@ if not defined LOCAL_IP (
 echo [config] Detected IP: %LOCAL_IP%
 
 :: ── Write .env (Vite only — Flask reads API\.env separately) ──────────
+:: VITE_LOCAL_IP is always localhost for browser dev — the network IP is
+:: only needed for React Native on a physical device (start-rn.bat writes it).
 (
     echo VITE_LOCAL_DEV=true
-    echo VITE_LOCAL_IP=%LOCAL_IP%
-    echo LOCAL_IP=%LOCAL_IP%
+    echo VITE_LOCAL_IP=localhost
+    echo LOCAL_IP=localhost
+    echo LOCAL_IP_NETWORK=%LOCAL_IP%
 ) > "%ENV_FILE%"
 
 echo [config] Written %ENV_FILE%
@@ -40,5 +43,6 @@ start "utility-tools - Web Frontend" cmd /k "cd /d "%FRONTEND_DIR%" && npm run d
 
 echo.
 echo Started Backend and Web Frontend.
-echo Open your browser at http://%LOCAL_IP%:5173 (or the port Vite prints).
+echo Open your browser at http://localhost:5173 (or the port Vite prints).
+echo Network IP for React Native: %LOCAL_IP%
 echo.

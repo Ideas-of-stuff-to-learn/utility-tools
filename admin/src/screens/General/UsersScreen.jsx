@@ -84,7 +84,7 @@ export default function UsersScreen({ caller }) {
                                     <td style={{ color: 'var(--text-muted)' }}>{u.email || '—'}</td>
                                     <td>
                                         {u.level >= (caller?.level ?? 0) ? (
-                                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
+                                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Not authorised to edit</span>
                                         ) : assigning?.userId === u.id ? (
                                             <div className="row-actions">
                                                 <select

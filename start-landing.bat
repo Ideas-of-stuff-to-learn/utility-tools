@@ -26,7 +26,8 @@ echo [config] Detected IP: %LOCAL_IP%
 :: ── Write landing/.env ─────────────────────────────────────────────────────
 (
     echo VITE_LOCAL_DEV=true
-    echo VITE_LOCAL_IP=%LOCAL_IP%
+    echo VITE_LOCAL_IP=localhost
+    echo VITE_LOCAL_IP_NETWORK=%LOCAL_IP%
 ) > "%ENV_FILE%"
 
 echo [config] Written %ENV_FILE%

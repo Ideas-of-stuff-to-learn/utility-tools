@@ -1,11 +1,11 @@
 const BASE_URL = import.meta.env.PROD
     ? 'https://cashflow2-0.onrender.com'
-    : `http://${import.meta.env.VITE_LOCAL_IP || 'localhost'}:5000`;
+    : `http://${import.meta.env.VITE_LOCAL_IP || 'localhost'}:${import.meta.env.VITE_BACKEND_PORT || '5050'}`;
 
 const DEFAULT_TIMEOUT_MS = 110000;
 
-let csrfAccessToken = null;
-let csrfRefreshToken = null;
+let csrfAdminAccess  = null;
+let csrfAdminRefresh = null;
 
 async function fetchWithTimeout(url, options, timeoutMs = DEFAULT_TIMEOUT_MS) {
     const controller = new AbortController();
@@ -42,14 +42,15 @@ async function tryRefresh() {
     if (refreshPromise) return refreshPromise;
     refreshPromise = (async () => {
         try {
-            const r = await fetchWithTimeout(`${BASE_URL}/auth/refresh`, {
+            const r = await fetchWithTimeout(`${BASE_URL}/admin/auth/refresh`, {
                 method: 'POST',
                 credentials: 'include',
-                headers: { 'X-CSRF-TOKEN': csrfRefreshToken },
+                headers: { 'X-Admin-CSRF-TOKEN': csrfAdminRefresh },
             }, 70000);
             if (r.ok) {
                 const d = await r.json();
-                csrfAccessToken = d.csrf_access_token;
+                csrfAdminAccess  = d.csrf_admin_access;
+                csrfAdminRefresh = d.csrf_admin_refresh;
             } else {
                 window.dispatchEvent(new CustomEvent('auth:session-expired'));
             }
@@ -65,7 +66,7 @@ async function authFetch(url, options = {}) {
     let r = await fetchWithTimeout(url, {
         ...options,
         credentials: 'include',
-        headers: { ...options.headers, 'X-CSRF-TOKEN': csrfAccessToken },
+        headers: { ...options.headers, 'X-CSRF-TOKEN': csrfAdminAccess },
     });
     if (r.status === 401) {
         const ok = await tryRefresh();
@@ -73,7 +74,7 @@ async function authFetch(url, options = {}) {
         r = await fetchWithTimeout(url, {
             ...options,
             credentials: 'include',
-            headers: { ...options.headers, 'X-CSRF-TOKEN': csrfAccessToken },
+            headers: { ...options.headers, 'X-CSRF-TOKEN': csrfAdminAccess },
         });
     }
     return r;
@@ -81,59 +82,46 @@ async function authFetch(url, options = {}) {
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
-export async function login(identifier, password) {
-    const field = identifier.includes('@') ? 'email' : 'username';
-    const r = await fetchWithTimeout(`${BASE_URL}/auth/login`, {
+// Step 1: verify username + password → returns temp_token + step
+export async function loginStep1(username, password) {
+    const r = await fetchWithTimeout(`${BASE_URL}/admin/auth/login`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: identifier, password, website: '' }),
+        body: JSON.stringify({ username, password }),
     }, 70000);
-    const d = await parseJson(r, 'Login failed');
-    csrfAccessToken = d.csrf_access_token;
-    csrfRefreshToken = d.csrf_refresh_token;
-    return d;
+    return parseJson(r, 'Login failed');
 }
 
-export async function signup(username, password, email) {
-    const body = { username, password };
-    if (email) body.email = email;
-    const r = await fetchWithTimeout(`${BASE_URL}/auth/signup`, {
+// Step 2: verify TOTP code → issues session cookies
+export async function loginStep2(tempToken, totpCode) {
+    const r = await fetchWithTimeout(`${BASE_URL}/admin/auth/verify-totp`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ temp_token: tempToken, totp_code: totpCode }),
     }, 70000);
-    const d = await parseJson(r, 'Signup failed');
-    csrfAccessToken = d.csrf_access_token;
-    csrfRefreshToken = d.csrf_refresh_token;
+    const d = await parseJson(r, 'Verification failed');
+    csrfAdminAccess  = d.csrf_admin_access;
+    csrfAdminRefresh = d.csrf_admin_refresh;
     return d;
 }
 
 export async function logout() {
-    await fetch(`${BASE_URL}/auth/logout`, {
+    await fetch(`${BASE_URL}/admin/auth/logout`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'X-CSRF-TOKEN': csrfAccessToken },
+        headers: { 'X-CSRF-TOKEN': csrfAdminAccess },
     }).catch(() => {});
-    csrfAccessToken = null;
-    csrfRefreshToken = null;
-}
-
-export async function forgotPassword(email) {
-    const r = await fetchWithTimeout(`${BASE_URL}/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, website: '' }),
-    }, 30000);
-    return parseJson(r, 'Request failed');
+    csrfAdminAccess  = null;
+    csrfAdminRefresh = null;
 }
 
 export async function getMe() {
-    const r = await authFetch(`${BASE_URL}/auth/me`, { method: 'GET' });
+    const r = await authFetch(`${BASE_URL}/admin/auth/me`, { method: 'GET' });
     const d = await parseJson(r, 'Failed to fetch account info');
-    if (d.csrf_access_token) csrfAccessToken = d.csrf_access_token;
-    if (d.csrf_refresh_token) csrfRefreshToken = d.csrf_refresh_token;
+    if (d.csrf_admin_access)  csrfAdminAccess  = d.csrf_admin_access;
+    if (d.csrf_admin_refresh) csrfAdminRefresh = d.csrf_admin_refresh;
     return d;
 }
 
@@ -274,4 +262,25 @@ export async function cancelCategoryDeletion(name) {
         body: JSON.stringify({ name }),
     });
     return parseJson(r, 'Failed to cancel category deletion');
+}
+
+// ── Admin — admin accounts ────────────────────────────────────────────────────
+
+export async function getAdminAccounts() {
+    const r = await authFetch(`${BASE_URL}/admin/accounts`);
+    return (await parseJson(r, 'Failed to fetch admin accounts')).accounts;
+}
+
+export async function createAdminAccount(username, password, role) {
+    const r = await authFetch(`${BASE_URL}/admin/accounts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, role }),
+    });
+    return (await parseJson(r, 'Failed to create admin account')).account;
+}
+
+export async function deleteAdminAccount(id) {
+    const r = await authFetch(`${BASE_URL}/admin/accounts/${id}`, { method: 'DELETE' });
+    return parseJson(r, 'Failed to delete admin account');
 }

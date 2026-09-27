@@ -17,7 +17,7 @@ const tools = [
     description: 'Track and categorize your bank transactions. Upload CSV or Excel statements and get instant spending breakdowns.',
     icon: '💸',
     status: 'live',
-    href: '/utility-tools/cashflow/',
+    href: import.meta.env.DEV ? 'http://localhost:5173' : '/utility-tools/cashflow/',
     accentColor: '#4f8ef7',
   },
   {

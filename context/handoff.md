@@ -1,3 +1,43 @@
+## Pre-Compact Snapshot — 2026-09-27 00:44
+
+**Git HEAD:** `10f3bf4`
+**Files touched:** tools/cashflow/WebUI/vite.config.js, tools/cashflow/API/schema.sql, context/revert-state.md, admin/src/components/Sidebar.jsx, admin/src/screens/Auth/ForgotPasswordScreen.jsx...
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
+## Pre-Compact Snapshot — 2026-09-26 23:19
+
+**Git HEAD:** `10f3bf4`
+**Files touched:** context/handoff.md, tools/cashflow/start-web.bat, start-landing.bat, tools/cashflow/API/backend.py, landing/src/App.jsx...
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
+## Pre-Compact Snapshot — 2026-09-26 22:36
+
+**Git HEAD:** `10f3bf4`
+**Files touched:** start-landing.bat, tools/cashflow/backendLocalConfig.py, tools/cashflow/start-web.bat, landing/src/App.jsx, context/handoff.md...
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
+## Pre-Compact Snapshot — 2026-09-26 18:42
+
+**Git HEAD:** `b9fb398`
+**Files touched:** (none — no uncommitted changes)
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
 ## Pre-Compact Snapshot — 2026-09-24 20:43
 
 **Git HEAD:** `7e49833`

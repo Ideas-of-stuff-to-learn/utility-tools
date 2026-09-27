@@ -20,6 +20,7 @@ export default function Sidebar({ user, onLogout }) {
             <div className="admin-sidebar-section">General</div>
             <NavLink className="admin-nav-item" to="/general/users">Users</NavLink>
             <NavLink className="admin-nav-item" to="/general/roles">Roles &amp; Permissions</NavLink>
+            <NavLink className="admin-nav-item" to="/general/admin-accounts">Admin Accounts</NavLink>
             <NavLink className="admin-nav-item" to="/general/unlock">Unlock Account</NavLink>
             <NavLink className="admin-nav-item" to="/general/impersonation-log">Impersonation Log</NavLink>
 

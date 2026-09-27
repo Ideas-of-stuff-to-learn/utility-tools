@@ -1,22 +1,22 @@
 import { useEffect, useState } from 'react';
 import { getRoles, getPermissions, createRole, updateRole, deleteRole, cancelRoleDeletion } from '../../api.js';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal.jsx';
-
-function levelLabel(level, roles) {
-    const match = roles.find(r => r.level === level);
-    return match ? `${match.name} (${level})` : `${level}`;
-}
+import { computeRoleLevel } from '../../utils/permissionWeights.js';
 
 function RoleModal({ role, allPermissions, allRoles, caller, onSave, onClose }) {
     const [name, setName] = useState(role?.name || '');
-    const [level, setLevel] = useState(role?.level ?? '');
     const [selected, setSelected] = useState(new Set(role?.permissions || []));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [manualLevel, setManualLevel] = useState(role?.level ?? '');
 
-    const maxLevel = caller.level - 1;
+    const overrideMin = parseInt(import.meta.env.VITE_ADMIN_LEVEL_OVERRIDE_MIN ?? '80', 10);
+    const canOverride = caller.role === 'owner' || caller.level >= overrideMin;
 
-    // Permissions the caller can grant (only those belonging to roles below their own level)
+    const computedLevel = computeRoleLevel([...selected]);
+    const effectiveLevel = canOverride && manualLevel !== '' ? parseInt(manualLevel, 10) : computedLevel;
+    const tooHigh = effectiveLevel >= caller.level;
+
     const grantablePerms = new Set(
         allPermissions
             .filter(p => {
@@ -37,14 +37,10 @@ function RoleModal({ role, allPermissions, allRoles, caller, onSave, onClose }) 
     }
 
     async function handleSave() {
-        const lvl = parseInt(level, 10);
-        if (lvl >= caller.level) {
-            setError(`Level must be below your own level (${caller.level})`);
-            return;
-        }
+        if (tooHigh) return;
         setSaving(true); setError('');
         try {
-            await onSave({ name, level: lvl, permissions: [...selected] });
+            await onSave({ name, level: effectiveLevel, permissions: [...selected] });
             onClose();
         } catch (e) {
             setError(e.message);
@@ -66,18 +62,31 @@ function RoleModal({ role, allPermissions, allRoles, caller, onSave, onClose }) 
                 </div>
                 <div className="form-row">
                     <label className="form-label">Level</label>
-                    <input
-                        className="admin-input"
-                        type="number"
-                        value={level}
-                        min={0}
-                        max={maxLevel}
-                        onChange={e => setLevel(e.target.value)}
-                        style={{ maxWidth: 120 }}
-                    />
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                        Max: {maxLevel} (must be below your level of {caller.level})
-                    </div>
+                    {canOverride ? (
+                        <>
+                            <input
+                                className="admin-input"
+                                type="number"
+                                value={manualLevel !== '' ? manualLevel : computedLevel}
+                                min={1}
+                                max={caller.level - 1}
+                                onChange={e => setManualLevel(e.target.value)}
+                                style={{ maxWidth: 120 }}
+                            />
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                                Formula suggests <strong>{computedLevel}</strong> — you may override (max {caller.level - 1})
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--text)' }}>
+                                {computedLevel}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                                Auto-calculated from selected permissions
+                            </div>
+                        </>
+                    )}
                     {sortedRoles.length > 0 && (
                         <div style={{ marginTop: 8, padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 6, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.8 }}>
                             <strong style={{ color: 'var(--text)' }}>Existing levels:</strong>{' '}
@@ -104,9 +113,24 @@ function RoleModal({ role, allPermissions, allRoles, caller, onSave, onClose }) 
                 </div>
                 <div className="modal-actions">
                     <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
-                    <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                        {saving ? 'Saving…' : 'Save'}
-                    </button>
+                    {tooHigh ? (
+                        <div style={{
+                            background: 'var(--danger, #ef4444)',
+                            color: '#fff',
+                            borderRadius: 6,
+                            padding: '8px 16px',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            userSelect: 'none',
+                            cursor: 'default',
+                        }}>
+                            Role power ≥ your level — unauthorised
+                        </div>
+                    ) : (
+                        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                            {saving ? 'Saving…' : 'Save'}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -206,7 +230,7 @@ export default function RolesScreen({ caller = { role: 'user', level: 0 } }) {
                                     <td>
                                         <div className="row-actions">
                                             {r.level >= caller.level ? (
-                                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
+                                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Not authorised to edit</span>
                                             ) : isPending ? (
                                                 <button className="btn btn-primary btn-sm" onClick={() => handleCancelDelete(r)}>Cancel deletion</button>
                                             ) : (

@@ -35,7 +35,7 @@ export default function ProfilePopup({ onClose }) {
     const isAdmin = userRole?.role === 'owner' || (userRole?.permissions || []).includes('admin.panel.view');
     const adminUrl = import.meta.env.PROD
         ? 'https://ideas-of-stuff-to-learn.github.io/utility-tools/admin/'
-        : 'http://localhost:5175/';
+        : `http://localhost:${import.meta.env.VITE_ADMIN_PORT || '5175'}/`;
 
     return (
         <div className="profile-popup" ref={popupRef}>

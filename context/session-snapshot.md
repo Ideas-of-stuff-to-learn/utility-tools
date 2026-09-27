@@ -1,13 +1,44 @@
-# Session Snapshot — 2026-09-24 20:43
+# Session Snapshot — 2026-09-27 00:44
 
-**Git HEAD:** `7e49833`
+**Git HEAD:** `10f3bf4`
 **Triggered by:** PreCompact (context window about to be summarised)
 
 ## Active Task
 (no active task)
 
 ## Files Touched This Session
-- tasks/backlog.md
+- tools/cashflow/WebUI/vite.config.js
+- tools/cashflow/API/schema.sql
+- context/revert-state.md
+- admin/src/components/Sidebar.jsx
+- admin/src/screens/Auth/ForgotPasswordScreen.jsx
+- tools/cashflow/API/requirements.txt
+- tools/cashflow/backendLocalConfig.py
+- admin/src/api.js
+- context/session-snapshot.md
+- tools/cashflow/API/routes/admin.py
+- admin/package.json
+- admin/src/screens/General/UsersScreen.jsx
+- admin/vite.config.js
+- admin/src/screens/Auth/SignupScreen.jsx
+- admin/src/screens/Auth/LoginScreen.jsx
+- landing/src/App.jsx
+- landing/src/api.js
+- admin/src/screens/General/UnlockScreen.jsx
+- landing/vite.config.js
+- tools/cashflow/WebUI/src/components/ProfilePopup.jsx
+- admin/src/App.jsx
+- admin/package-lock.json
+- tools/cashflow/frontendLocalConfig.jsx
+- admin/src/screens/General/RolesScreen.jsx
+- tools/cashflow/start-rn.bat
+- landing/src/components/ProfilePopup.jsx
+- start-landing.bat
+- tools/cashflow/start-all.bat
+- tools/cashflow/API/backend.py
+- context/handoff.md
+- tools/cashflow/API/permissions.py
+- tools/cashflow/start-web.bat
 
 ## Context
 This snapshot was auto-written before context summarisation.

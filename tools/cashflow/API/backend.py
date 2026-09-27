@@ -29,10 +29,12 @@ small helpers used by more than one route module.
 import os
 
 from extensions import app
+from backendLocalConfig import BACKEND_PORT
 
 import routes.auth
 import routes.categories
 import routes.admin
+import routes.admin_auth
 import routes.transactions
 import routes.charts
 import routes.health
@@ -43,6 +45,6 @@ if __name__ == '__main__':
     debug = os.environ.get('FLASK_ENV') == 'development'
     app.run(
         host='0.0.0.0',
-        port=5000,
+        port=BACKEND_PORT,
         debug=debug,
     )
