@@ -45,8 +45,7 @@ export default function StackChartCanvas({
     // Current mode + window state for IDB persistence
     mode, monthWindowStart, yearWindowStart, selectedCategories,
 }) {
-    if (!stackData || stackData.length === 0) return null;
-
+    // All hooks must run unconditionally — early return is below them
     const canvasRef    = useRef(null);
     const containerRef = useRef(null);
     const dprRef       = useRef(window.devicePixelRatio || 1);
@@ -86,6 +85,9 @@ export default function StackChartCanvas({
             img.src = cache.pngBase64;
         }, [heightScale]),
     });
+
+    // Early return AFTER all hooks — hooks must always run in the same order
+    if (!stackData || stackData.length === 0) return null;
 
     // Geometry derived from props
     const chartHeight   = BASE_CHART_HEIGHT * heightScale;
