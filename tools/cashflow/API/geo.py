@@ -296,9 +296,25 @@ def check_geo_at_login(admin_user_id, ip, conn):
     """
     geo = _lookup_ip_raw(ip)
     if geo is None:
-        # API error — log and allow (fail open so API downtime doesn't lock out owner)
+        # API unreachable — use cached geo state rather than pure fail-open.
+        # If last known country is in the allowlist (or no allowlist) and was
+        # checked within 48h, allow. If last known country was NOT in the
+        # allowlist, block. Only fail-open when there is no prior geo data at all.
         _log_geo(conn, admin_user_id, ip, 'login', '', '', 'api_error')
-        logger.warning('GeoIP lookup failed at login for admin %s — allowing (fail-open)', admin_user_id)
+        logger.warning('GeoIP lookup failed at login for admin %s — checking cached state', admin_user_id)
+        row = _get_admin_geo_state(conn, admin_user_id)
+        if row and row[0] and row[2]:  # last_geo_country, last_geo_checked_at
+            last_country, _, last_checked_at, _, _ = row
+            now = datetime.now(timezone.utc)
+            if (now - last_checked_at).total_seconds() < 48 * 3600:
+                # Recent cached data available
+                if _ALLOWLIST and last_country not in _ALLOWLIST:
+                    msg = f'Login blocked: GeoIP API unavailable and last known country ({last_country}) is not in the allowlist.'
+                    return False, True, msg, 'api_error'
+                # Last known country is allowed — let through
+                return True, False, '', 'api_error'
+        # No recent cached data — fail-open (first login ever, or stale cache)
+        logger.warning('No recent cached geo state for admin %s — failing open', admin_user_id)
         return True, False, '', 'api_error'
 
     country  = geo['country_code']
@@ -357,7 +373,23 @@ def check_geo_heartbeat(admin_user_id, ip, jti, conn, trigger='heartbeat'):
     geo = _lookup_ip_raw(ip)
     if geo is None:
         _log_geo(conn, admin_user_id, ip, trigger, '', '', 'api_error')
-        logger.warning('GeoIP lookup failed at %s for admin %s — allowing (fail-open)', trigger, admin_user_id)
+        logger.warning('GeoIP lookup failed at %s for admin %s — checking cached state', trigger, admin_user_id)
+        row = _get_admin_geo_state(conn, admin_user_id)
+        if row and row[0] and row[2]:
+            last_country, _, last_checked_at, _, _ = row
+            now = datetime.now(timezone.utc)
+            if (now - last_checked_at).total_seconds() < 48 * 3600:
+                if _ALLOWLIST and last_country not in _ALLOWLIST:
+                    # Last known country isn't allowed — revoke and block
+                    if jti:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "INSERT INTO revoked_tokens (jti) VALUES (%s) ON CONFLICT DO NOTHING",
+                                (jti,),
+                            )
+                    msg = f'Session blocked: GeoIP API unavailable and last known country ({last_country}) is not in the allowlist.'
+                    return False, msg, 'api_error'
+                return True, '', 'api_error'
         return True, '', 'api_error'
 
     country   = geo['country_code']

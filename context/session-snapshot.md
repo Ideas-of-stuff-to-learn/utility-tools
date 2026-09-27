@@ -1,17 +1,14 @@
-# Session Snapshot — 2026-09-27 01:44
+# Session Snapshot — 2026-09-27 15:27
 
-**Git HEAD:** `5475406`
+**Git HEAD:** `a74070d`
 **Triggered by:** PreCompact (context window about to be summarised)
 
 ## Active Task
 (no active task)
 
 ## Files Touched This Session
-- admin/src/components/Sidebar.jsx
-- tools/cashflow/API/permission_weights.py
-- tools/cashflow/API/schema.sql
-- admin/src/utils/permissionWeights.js
-- tools/cashflow/API/routes/admin_auth.py
+- context/session-snapshot.md
+- context/handoff.md
 
 ## Context
 This snapshot was auto-written before context summarisation.
