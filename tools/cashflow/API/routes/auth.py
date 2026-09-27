@@ -19,6 +19,7 @@ from flask_jwt_extended import (
 import bcrypt
 
 from extensions import app, limiter
+from hmac_auth import derive_signing_secret
 from rate_limits import (
     RL_AUTH_ME, RL_AUTH_LOGIN, RL_AUTH_SIGNUP, RL_AUTH_REFRESH,
     RL_ADMIN_SENSITIVE, RL_AUTH_EMAIL_SEND, RL_AUTH_FORGOT_PASSWORD,
@@ -728,11 +729,13 @@ def login():
         # see refresh() below.
         access_token = create_access_token(identity=str(user_id), fresh=True)
         refresh_token = create_refresh_token(identity=str(user_id))
+        access_jti = decode_token(access_token)['jti']
         resp = jsonify({
             'access_token': access_token,
             'refresh_token': refresh_token,
             'csrf_access_token': get_csrf_token(access_token),
             'csrf_refresh_token': get_csrf_token(refresh_token),
+            'hmac_signing_secret': derive_signing_secret(str(user_id), access_jti),
         })
         set_access_cookies(resp, access_token)
         set_refresh_cookies(resp, refresh_token)
@@ -805,11 +808,13 @@ def signup():
         # reasoning as login()'s fresh=True above.
         access_token = create_access_token(identity=str(new_id), fresh=True)
         refresh_token = create_refresh_token(identity=str(new_id))
+        access_jti = decode_token(access_token)['jti']
         resp = jsonify({
             'access_token': access_token,
             'refresh_token': refresh_token,
             'csrf_access_token': get_csrf_token(access_token),
             'csrf_refresh_token': get_csrf_token(refresh_token),
+            'hmac_signing_secret': derive_signing_secret(str(new_id), access_jti),
         })
         set_access_cookies(resp, access_token)
         set_refresh_cookies(resp, refresh_token)
@@ -842,9 +847,11 @@ def refresh():
     """
     current_user = get_jwt_identity()
     new_access_token = create_access_token(identity=current_user, fresh=False)
+    new_jti = decode_token(new_access_token)['jti']
     resp = jsonify({
         'access_token': new_access_token,
         'csrf_access_token': get_csrf_token(new_access_token),
+        'hmac_signing_secret': derive_signing_secret(str(current_user), new_jti),
     })
     set_access_cookies(resp, new_access_token)
     return resp, 200

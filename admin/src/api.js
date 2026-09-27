@@ -4,8 +4,20 @@ const BASE_URL = import.meta.env.PROD
 
 const DEFAULT_TIMEOUT_MS = 110000;
 
-let csrfAdminAccess  = null;
-let csrfAdminRefresh = null;
+let csrfAdminAccess    = null;
+let csrfAdminRefresh   = null;
+let hmacSigningSecret  = null;  // hex string, held in JS memory only
+
+async function computeHmacHeaders(method, path) {
+    if (!hmacSigningSecret) return {};
+    const ts = Math.floor(Date.now() / 1000);
+    const msg = new TextEncoder().encode(`${ts}:${method.toUpperCase()}:${path}`);
+    const keyBytes = new Uint8Array(hmacSigningSecret.match(/.{2}/g).map(b => parseInt(b, 16)));
+    const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const sig = await crypto.subtle.sign('HMAC', key, msg);
+    const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+    return { 'X-HMAC-Sig': hex, 'X-HMAC-TS': String(ts) };
+}
 
 async function fetchWithTimeout(url, options, timeoutMs = DEFAULT_TIMEOUT_MS) {
     const controller = new AbortController();
@@ -51,6 +63,7 @@ async function tryRefresh() {
                 const d = await r.json();
                 csrfAdminAccess  = d.csrf_admin_access;
                 csrfAdminRefresh = d.csrf_admin_refresh;
+                if (d.hmac_signing_secret) hmacSigningSecret = d.hmac_signing_secret;
             } else {
                 window.dispatchEvent(new CustomEvent('auth:session-expired'));
             }
@@ -63,18 +76,22 @@ async function tryRefresh() {
 }
 
 async function authFetch(url, options = {}) {
+    const method = options.method || 'GET';
+    const path = new URL(url, 'http://x').pathname;
+    const hmacHeaders = await computeHmacHeaders(method, path);
     let r = await fetchWithTimeout(url, {
         ...options,
         credentials: 'include',
-        headers: { ...options.headers, 'X-CSRF-TOKEN': csrfAdminAccess },
+        headers: { ...options.headers, 'X-CSRF-TOKEN': csrfAdminAccess, ...hmacHeaders },
     });
     if (r.status === 401) {
         const ok = await tryRefresh();
         if (!ok) throw new Error('Not logged in');
+        const hmacHeaders2 = await computeHmacHeaders(method, path);
         r = await fetchWithTimeout(url, {
             ...options,
             credentials: 'include',
-            headers: { ...options.headers, 'X-CSRF-TOKEN': csrfAdminAccess },
+            headers: { ...options.headers, 'X-CSRF-TOKEN': csrfAdminAccess, ...hmacHeaders2 },
         });
     }
     return r;
@@ -104,6 +121,7 @@ export async function loginStep2(tempToken, totpCode) {
     const d = await parseJson(r, 'Verification failed');
     csrfAdminAccess  = d.csrf_admin_access;
     csrfAdminRefresh = d.csrf_admin_refresh;
+    if (d.hmac_signing_secret) hmacSigningSecret = d.hmac_signing_secret;
     return d;
 }
 
@@ -113,8 +131,9 @@ export async function logout() {
         credentials: 'include',
         headers: { 'X-CSRF-TOKEN': csrfAdminAccess },
     }).catch(() => {});
-    csrfAdminAccess  = null;
-    csrfAdminRefresh = null;
+    csrfAdminAccess   = null;
+    csrfAdminRefresh  = null;
+    hmacSigningSecret = null;
 }
 
 export async function getMe() {

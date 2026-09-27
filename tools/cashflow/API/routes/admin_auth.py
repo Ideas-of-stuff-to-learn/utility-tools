@@ -34,6 +34,7 @@ from database import get_connection, release_connection
 from permissions import (
     get_admin_role_and_permissions, require_admin_auth,
 )
+from hmac_auth import derive_signing_secret
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -278,6 +279,7 @@ def admin_verify_totp():
         conn.commit()
 
         access_token, refresh_token = _issue_admin_session(admin_id)
+        access_jti = decode_token(access_token)['jti']
         role_name, level, perms = get_admin_role_and_permissions(conn, admin_id)
         with conn.cursor() as cur:
             cur.execute("SELECT username FROM admin_users WHERE id = %s", (admin_id,))
@@ -286,6 +288,7 @@ def admin_verify_totp():
         resp = jsonify({
             'csrf_admin_access':  get_csrf_token(access_token),
             'csrf_admin_refresh': get_csrf_token(refresh_token),
+            'hmac_signing_secret': derive_signing_secret(str(admin_id), access_jti),
             'role': role_name,
             'level': level,
             'permissions': sorted(perms),
@@ -327,6 +330,7 @@ def admin_refresh():
 
     admin_id = int(token_data['sub'])
     access_token, refresh_token = _issue_admin_session(admin_id)
+    access_jti = decode_token(access_token)['jti']
 
     conn = get_connection()
     try:
@@ -337,6 +341,7 @@ def admin_refresh():
     resp = jsonify({
         'csrf_admin_access':  get_csrf_token(access_token),
         'csrf_admin_refresh': get_csrf_token(refresh_token),
+        'hmac_signing_secret': derive_signing_secret(str(admin_id), access_jti),
     })
     _set_admin_cookies(resp, access_token, refresh_token)
     return resp, 200

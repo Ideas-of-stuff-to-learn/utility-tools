@@ -20,9 +20,10 @@ and for the seed data / one-time backfill.
 from functools import wraps
 
 from flask import jsonify, request, g
-from flask_jwt_extended import get_jwt_identity, decode_token
+from flask_jwt_extended import get_jwt_identity, get_jwt, decode_token
 
 from database import get_connection, release_connection
+from hmac_auth import verify_hmac_request
 
 # The owner tier is a hard ceiling, deliberately NOT implemented by
 # seeding every permission row against an 'owner' role_permissions
@@ -522,8 +523,30 @@ def require_admin_auth(permission_key=None):
 
             g.admin_user_id = admin_user_id
             g.admin_token_jti = jti
+
+            # HMAC verification — every authenticated request must be signed
+            ok, reason = verify_hmac_request(request, str(admin_user_id), jti or '')
+            if not ok:
+                return jsonify({'error': f'HMAC verification failed: {reason}'}), 401
+
             return fn(*args, **kwargs)
         return wrapper
     return decorator
 
     return next(u for u in list_all_users(conn) if u['id'] == target_user_id)
+
+
+def require_hmac(fn):
+    """Decorator for regular JWT-protected routes (@jwt_required routes).
+    Must be applied AFTER @jwt_required so get_jwt_identity() and get_jwt()
+    are available. Verifies the HMAC signature on the request."""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        claims = get_jwt()
+        user_id = get_jwt_identity()
+        jti = claims.get('jti', '')
+        ok, reason = verify_hmac_request(request, str(user_id), jti)
+        if not ok:
+            return jsonify({'error': f'HMAC verification failed: {reason}'}), 401
+        return fn(*args, **kwargs)
+    return wrapper

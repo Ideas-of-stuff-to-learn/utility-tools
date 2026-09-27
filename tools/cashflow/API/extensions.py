@@ -123,3 +123,47 @@ limiter = Limiter(
 )
 
 
+@app.after_request
+def set_security_headers(response):
+    """Attach security headers to every response."""
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'none'; "
+        "frame-ancestors 'none';"
+    )
+    return response
+
+
+@app.before_request
+def verify_hmac_for_authenticated_requests():
+    """For any request that carries a valid user JWT cookie, verify the
+    HMAC signature. Unauthenticated requests (no cookie) are skipped —
+    they have no signing secret yet. Admin routes use require_admin_auth
+    which has its own HMAC check; this covers the regular JWT routes."""
+    import os
+    from flask import request as req, jsonify as _jsonify
+    from flask_jwt_extended import decode_token
+
+    # Skip admin routes — handled by require_admin_auth
+    if req.path.startswith('/admin/'):
+        return
+
+    token = req.cookies.get('access_token_cookie')
+    if not token:
+        return  # unauthenticated — skip
+
+    try:
+        data = decode_token(token)
+    except Exception:
+        return  # invalid token — let @jwt_required handle it
+
+    from hmac_auth import verify_hmac_request
+    user_id = data.get('sub', '')
+    jti = data.get('jti', '')
+    ok, reason = verify_hmac_request(req, str(user_id), jti)
+    if not ok:
+        return _jsonify({'error': f'HMAC verification failed: {reason}'}), 401
+
+
