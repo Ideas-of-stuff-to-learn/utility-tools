@@ -38,3 +38,4 @@ YYYY-MM-DD | task: <what was done> | SQLite queries: <N> | context docs loaded: 
 2026-09-23 | task: Task 0b - propagate GitHub rename Cashflow2.0->utility-tools | SQLite queries: 0 | context docs loaded: 1 (gitContext) | full repo scan avoided: yes | 7 files updated, build verified green
 2026-09-23 | task: Task 1 - email migration (auth.py + api.jsx + LoginScreen + SignupScreen) | SQLite queries: 0 | context docs loaded: 1 (auth-design) | full repo scan avoided: yes | build verified green
 2026-09-23 | task: Task 2 - email_service.py (Gmail SMTP module) | SQLite queries: 0 | context docs loaded: 0 | full repo scan avoided: yes | new file only, no existing code modified
+2026-09-27 | task: Task 1 JWT claim wiring + HMAC fix | SQLite queries: 2 | context docs loaded: 4 | full repo scan avoided: yes | tasks 1+22+27+26+23+24 all complete, HMAC login bug fixed
