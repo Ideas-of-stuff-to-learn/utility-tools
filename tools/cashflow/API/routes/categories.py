@@ -11,12 +11,12 @@ from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from extensions import app, limiter
-from rate_limits import RL_CATEGORY_WRITE, RL_READ_CATEGORIES
+from middleware.user_rate_limits import RL_CATEGORY_WRITE, RL_READ_CATEGORIES
 from database import get_connection, release_connection
 from cache import CategoryCache
 from matching import patch_merchants_category_rename
 from checkingName import NEEDS_MANUAL_REVIEW
-from permissions import require_permission, get_user_role_and_permissions
+from middleware.user_middleware import require_permission, get_user_role_and_permissions
 import re
 
 @app.route('/categories', methods=['GET'])

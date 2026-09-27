@@ -20,7 +20,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from psycopg2.extras import execute_values
 
 from extensions import app, limiter
-from rate_limits import RL_UPLOAD
+from middleware.user_rate_limits import RL_UPLOAD
 from database import get_connection, release_connection
 from .shared_helpers import sanitize_cell, MAX_CSV_FILE_SIZE_BYTES
 

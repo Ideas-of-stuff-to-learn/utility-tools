@@ -17,7 +17,7 @@ from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from extensions import app, limiter
-from rate_limits import RL_CATEGORISE_CACHED, RL_CATEGORISE_LLM, RL_CATEGORISE_BATCH
+from middleware.user_rate_limits import RL_CATEGORISE_CACHED, RL_CATEGORISE_LLM, RL_CATEGORISE_BATCH
 from database import get_connection, release_connection
 from cache import CategoryCache
 from categorise.pipeline import run_cache_tiers

@@ -29,14 +29,12 @@ from flask_jwt_extended import (
 )
 
 from extensions import app, limiter
-from rate_limits import (
-    RL_AUTH_LOGIN, RL_AUTH_ME, RL_AUTH_REFRESH,
-    RL_READ_ADMIN, RL_CATEGORY_WRITE, RL_ADMIN_SENSITIVE,
+from middleware.admin_rate_limits import (
+    RL_ADMIN_LOGIN, RL_ADMIN_ME, RL_ADMIN_REFRESH,
+    RL_READ_ADMIN, RL_ADMIN_WRITE, RL_ADMIN_SENSITIVE,
 )
 from database import get_connection, release_connection
-from permissions import (
-    get_admin_role_and_permissions, require_admin_auth,
-)
+from middleware.admin_middleware import get_admin_role_and_permissions, require_admin_auth
 from hmac_auth import derive_signing_secret
 
 import sys, os
@@ -145,7 +143,7 @@ def _increment_failed(conn, admin_user_id):
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.route('/admin/auth/login', methods=['POST'])
-@limiter.limit(RL_AUTH_LOGIN)
+@limiter.limit(RL_ADMIN_LOGIN)
 def admin_login():
     """Step 1 of 2-factor admin login: verify username + password.
     Returns a short-lived temp token used for the TOTP step.
@@ -225,7 +223,7 @@ def admin_login():
 
 
 @app.route('/admin/auth/verify-totp', methods=['POST'])
-@limiter.limit(RL_AUTH_LOGIN)
+@limiter.limit(RL_ADMIN_LOGIN)
 def admin_verify_totp():
     """Step 2 of 2-factor admin login: verify TOTP code.
     On success issues admin session cookies.
@@ -309,7 +307,7 @@ def admin_verify_totp():
 
 
 @app.route('/admin/auth/refresh', methods=['POST'])
-@limiter.limit(RL_AUTH_REFRESH)
+@limiter.limit(RL_ADMIN_REFRESH)
 def admin_refresh():
     """Refresh the admin session using the admin_refresh_token cookie."""
     token_str = request.cookies.get('admin_refresh_token')
@@ -382,7 +380,7 @@ def admin_logout():
 
 @app.route('/admin/auth/me', methods=['GET'])
 @require_admin_auth()
-@limiter.limit(RL_AUTH_ME)
+@limiter.limit(RL_ADMIN_ME)
 def admin_me():
     """Return the current admin user's identity + CSRF refresh token.
     Used on every admin panel load to check session validity.
@@ -463,7 +461,7 @@ def admin_list_accounts():
 
 @app.route('/admin/accounts', methods=['POST'])
 @require_admin_auth('admin.accounts.manage')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_create_account():
     """Create a new admin_users account with an assigned role."""
     caller_id = g.admin_user_id
@@ -522,7 +520,7 @@ def admin_create_account():
 
 @app.route('/admin/accounts/<int:target_id>', methods=['DELETE'])
 @require_admin_auth('admin.accounts.manage')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_delete_account(target_id):
     """Deactivate (hard-delete) an admin account. Cannot delete your own."""
     caller_id = g.admin_user_id
@@ -559,7 +557,7 @@ def admin_delete_account(target_id):
 
 @app.route('/admin/accounts/<int:target_id>', methods=['PATCH'])
 @require_admin_auth('admin.accounts.manage')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_edit_account(target_id):
     """Change the role of an admin account. Cannot edit your own or accounts at/above your level."""
     caller_id = g.admin_user_id

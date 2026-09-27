@@ -4,8 +4,8 @@ routes/auth.py
 Login, signup, refresh, logout, and "who am I" (/auth/me - used by
 both the app's role badge and the CLI's "what am I allowed to do").
 Token issuing/expiry/revocation lives here; the actual permission
-system (roles, permission checks) lives in permissions.py and
-routes/admin.py.
+system (roles, permission checks) lives in middleware/user_middleware.py
+and routes/admin.py.
 """
 from datetime import datetime, timezone, timedelta
 import os
@@ -20,13 +20,13 @@ import bcrypt
 
 from extensions import app, limiter
 from hmac_auth import derive_signing_secret
-from rate_limits import (
+from middleware.user_rate_limits import (
     RL_AUTH_ME, RL_AUTH_LOGIN, RL_AUTH_SIGNUP, RL_AUTH_REFRESH,
-    RL_ADMIN_SENSITIVE, RL_AUTH_EMAIL_SEND, RL_AUTH_FORGOT_PASSWORD,
+    RL_AUTH_LOGOUT, RL_AUTH_EMAIL_SEND, RL_AUTH_FORGOT_PASSWORD,
     RL_AUTH_CHANGE_PASSWORD, RL_AUTH_CANCEL_DELETION,
 )
 from database import get_connection, release_connection
-from permissions import get_user_role_and_permissions, user_has_permission
+from middleware.user_middleware import get_user_role_and_permissions, user_has_permission
 from email_service import send_email
 
 FRONTEND_BASE_URL = os.environ.get('FRONTEND_BASE_URL', 'http://localhost:5173')
@@ -859,7 +859,7 @@ def refresh():
 
 @app.route('/auth/logout', methods=['POST'])
 @jwt_required()
-@limiter.limit(RL_ADMIN_SENSITIVE)
+@limiter.limit(RL_AUTH_LOGOUT)
 def logout_route():
     """Actually revokes the calling token server-side - the first time
     "logout" has ever meant anything beyond a device deleting its own

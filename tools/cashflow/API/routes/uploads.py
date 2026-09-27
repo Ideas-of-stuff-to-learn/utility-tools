@@ -16,7 +16,7 @@ from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from extensions import app, limiter
-from rate_limits import RL_READ_UPLOADS
+from middleware.user_rate_limits import RL_READ_UPLOADS
 from database import get_connection, release_connection
 
 _VALID_UNITS = {'minutes', 'hours', 'days', 'months', 'years'}

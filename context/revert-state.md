@@ -1,6 +1,7 @@
 <!-- last-verified: f366d81 2026-09-24 -->
 2026-09-27 | task: security hardening — HMAC signing + CSP headers + rate limit | safe-point: 8c78077f455ff379d0a3edfeedab168d4fe7274f | status: complete
-2026-09-27 | task: fix admin account rate limits + combined require_auth decorator | safe-point: 8c78077f455ff379d0a3edfeedab168d4fe7274f | status: in-progress
+2026-09-27 | task: fix admin account rate limits + combined require_auth decorator | safe-point: 9ae0d649394dff5372b63d1323bc1fe3660ca6e3 | status: complete
+2026-09-27 | task: restructure into middleware/ folder (4 files) | safe-point: 9ae0d649394dff5372b63d1323bc1fe3660ca6e3 | status: in-progress
 2026-09-27 | task: admin accounts edit role + reset MFA buttons | safe-point: cad7fcf40b3be4151583550a963c6eee54e8492d | status: complete
 2026-09-27 | task: admin.accounts.manage permission gate (sidebar + backend + weights) | safe-point: cad7fcf40b3be4151583550a963c6eee54e8492d | status: complete
 2026-09-27 | task: global admin audit log | safe-point: ffdc15738ac2cf0ae39b1807d4b8afad12ee5215 | status: complete

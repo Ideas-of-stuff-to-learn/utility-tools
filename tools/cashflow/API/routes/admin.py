@@ -16,10 +16,12 @@ from flask_jwt_extended import create_access_token, decode_token
 import bcrypt
 
 from extensions import app, limiter, IMPERSONATION_TOKEN_EXPIRES
-from rate_limits import RL_READ_ADMIN, RL_CATEGORY_WRITE, RL_ADMIN_SENSITIVE, RL_ADMIN_UNLOCK, RL_ADMIN_USER_TRANSACTIONS
+from middleware.admin_rate_limits import (
+    RL_READ_ADMIN, RL_ADMIN_WRITE, RL_ADMIN_SENSITIVE, RL_ADMIN_UNLOCK, RL_ADMIN_USER_TRANSACTIONS,
+)
 from database import get_connection, release_connection
-from permissions import (
-    require_admin_auth, get_admin_role_and_permissions,
+from middleware.admin_middleware import require_admin_auth, get_admin_role_and_permissions
+from middleware.user_middleware import (
     list_all_permissions, list_all_roles, list_all_users,
     get_role_by_name, create_role, update_role, delete_role,
     assign_user_role, set_user_permission_override,
@@ -145,7 +147,7 @@ def admin_list_roles():
 
 @app.route('/admin/roles', methods=['POST'])
 @require_admin_auth('roles.manage')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_create_role():
     """Creates a new custom role. The caller's own level acts as a
     ceiling: you cannot create a role at or above your own level (an
@@ -199,7 +201,7 @@ def admin_create_role():
 
 @app.route('/admin/roles/<int:role_id>', methods=['PATCH'])
 @require_admin_auth('roles.manage')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_update_role(role_id):
     """Edits a role's level and/or permission bundle (permissions, if
     given, REPLACES the whole set - not additive, matching this app's
@@ -256,14 +258,14 @@ def admin_update_role(role_id):
 
 @app.route('/admin/roles/<int:role_id>', methods=['DELETE'])
 @require_admin_auth('roles.manage')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_delete_role(role_id):
     """Soft-delete: marks the role for deletion after a 48-hour grace period."""
     from datetime import datetime
     current_user = g.admin_user_id
     conn = get_connection()
     try:
-        from permissions import get_role_by_id
+        from middleware.user_middleware import get_role_by_id
         caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         role = get_role_by_id(conn, role_id)
         if not role:
@@ -300,12 +302,12 @@ def admin_delete_role(role_id):
 
 @app.route('/admin/roles/<int:role_id>/cancel-delete', methods=['POST'])
 @require_admin_auth('roles.manage')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_cancel_delete_role(role_id):
     current_user = g.admin_user_id
     conn = get_connection()
     try:
-        from permissions import get_role_by_id
+        from middleware.user_middleware import get_role_by_id
         caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
         role = get_role_by_id(conn, role_id)
         if not role:
@@ -468,7 +470,7 @@ def admin_list_users():
 
 @app.route('/admin/users/<int:target_user_id>/role', methods=['PATCH'])
 @require_admin_auth('users.assign_role')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_assign_role(target_user_id):
     """Assigns a role to another user, by role name. Same level-ceiling
     guard as role creation/editing: a non-owner with users.assign_role
@@ -518,7 +520,7 @@ def admin_assign_role(target_user_id):
 
 @app.route('/admin/users/<int:target_user_id>/permissions', methods=['PATCH'])
 @require_admin_auth('users.manage_permissions')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_set_permission_override(target_user_id):
     """Grants, revokes, or clears ONE individual permission override for
     ONE user - the fine-grained, per-person exception mechanism
@@ -589,7 +591,7 @@ def admin_set_permission_override(target_user_id):
 # and roles.* above.
 @app.route('/admin/users', methods=['POST'])
 @require_admin_auth('users.create')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_create_user():
     """Creates a new user account directly, as an elevated action -
     distinct from the public, self-service /auth/signup (no permission
@@ -626,7 +628,7 @@ def admin_create_user():
 
 @app.route('/admin/users/<int:target_user_id>', methods=['DELETE'])
 @require_admin_auth('users.delete')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_delete_user(target_user_id):
     """Deletes a Cashflow user account. Admin panel actors are from a
     separate admin_users table so the self-delete check is not needed here.
@@ -658,7 +660,7 @@ def admin_delete_user(target_user_id):
 
 @app.route('/admin/users/<int:target_user_id>/credentials', methods=['PATCH'])
 @require_admin_auth('users.edit')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_edit_user_credentials(target_user_id):
     """Changes a Cashflow user's username and/or password."""
     data = request.get_json() or {}
@@ -711,7 +713,7 @@ def admin_edit_user_credentials(target_user_id):
 
 @app.route('/admin/users/<int:target_user_id>/impersonate', methods=['POST'])
 @require_admin_auth('users.impersonate')
-@limiter.limit(RL_CATEGORY_WRITE)
+@limiter.limit(RL_ADMIN_WRITE)
 def admin_impersonate_user(target_user_id):
     """Issues a short-lived access token for a Cashflow user account —
     logged to impersonation_log with actor_admin_user_id.

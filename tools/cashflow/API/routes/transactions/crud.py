@@ -10,7 +10,7 @@ from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from extensions import app, limiter
-from rate_limits import RL_READ_STANDARD, RL_READ_TRANSACTIONS, RL_READ_UPLOADS
+from middleware.user_rate_limits import RL_READ_STANDARD, RL_READ_TRANSACTIONS, RL_READ_UPLOADS
 # RL_READ_STANDARD still used by DELETE /transactions below
 from database import get_connection, release_connection
 

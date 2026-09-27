@@ -9,7 +9,7 @@ from flask import jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from extensions import app, limiter
-from rate_limits import RL_READ_CHARTS
+from middleware.user_rate_limits import RL_READ_CHARTS
 from database import get_connection, release_connection
 from checkingName import NEEDS_MANUAL_REVIEW
 from shared import TRANSIENT_CATEGORY_VALUES
