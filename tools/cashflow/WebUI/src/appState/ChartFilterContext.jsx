@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { getChartSummary } from '../api';
+import { getChartSummary, getIdbKey, getIdbUserId } from '../api';
+import { get as idbGet, put as idbPut } from '../idb/store';
 import { useAuth } from './AuthContext';
 import { useTransactions } from './TransactionsContext';
 
@@ -50,27 +51,52 @@ export function ChartFilterProvider({ children }) {
         );
     }, []);
 
-    // Fetch chart summary whenever data version bumps or login state changes
+    // Fetch chart summary whenever data version bumps or login state changes.
+    // On every login, restore chartSummary from IDB first so hasData=true
+    // instantly for returning users — the server fetch then updates silently.
     useEffect(() => {
         if (!isLoggedIn) return;
         let cancelled = false;
 
-        async function fetchWithRetry(attempt = 1) {
-            try {
-                const data = await getChartSummary();
-                if (!cancelled) setChartSummary(data);
-            } catch (e) {
-                if (attempt >= 3) {
-                    console.warn(`Failed to load chart summary after ${attempt} attempts:`, e.message);
-                    return;
-                }
-                const delayMs = 1000 * attempt;
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-                if (!cancelled) await fetchWithRetry(attempt + 1);
+        async function run() {
+            // IDB warm-start: restore cached summary before network round-trip
+            const cryptoKey = getIdbKey();
+            const userId    = getIdbUserId();
+            if (cryptoKey && userId) {
+                try {
+                    const cached = await idbGet(userId, 'preferences', 'chart_summary', cryptoKey);
+                    if (!cancelled && cached && Array.isArray(cached.yearly) && cached.yearly.length > 0) {
+                        setChartSummary(cached);
+                    }
+                } catch (_) { /* IDB unavailable — fall through to server */ }
             }
+
+            // Background server fetch — always runs to keep data fresh
+            async function fetchWithRetry(attempt = 1) {
+                try {
+                    const data = await getChartSummary();
+                    if (!cancelled) {
+                        setChartSummary(data);
+                        // Persist for next visit so charts render instantly
+                        if (cryptoKey && userId) {
+                            idbPut(userId, 'preferences', 'chart_summary', data, cryptoKey).catch(() => {});
+                        }
+                    }
+                } catch (e) {
+                    if (attempt >= 3) {
+                        console.warn(`Failed to load chart summary after ${attempt} attempts:`, e.message);
+                        return;
+                    }
+                    const delayMs = 1000 * attempt;
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                    if (!cancelled) await fetchWithRetry(attempt + 1);
+                }
+            }
+
+            await fetchWithRetry();
         }
 
-        fetchWithRetry();
+        run();
         return () => { cancelled = true; };
     }, [chartDataVersion, isLoggedIn]);
 
