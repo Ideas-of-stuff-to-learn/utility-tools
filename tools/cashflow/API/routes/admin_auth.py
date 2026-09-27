@@ -29,7 +29,10 @@ from flask_jwt_extended import (
 )
 
 from extensions import app, limiter
-from rate_limits import RL_AUTH_LOGIN, RL_AUTH_ME, RL_AUTH_REFRESH
+from rate_limits import (
+    RL_AUTH_LOGIN, RL_AUTH_ME, RL_AUTH_REFRESH,
+    RL_READ_ADMIN, RL_CATEGORY_WRITE, RL_ADMIN_SENSITIVE,
+)
 from database import get_connection, release_connection
 from permissions import (
     get_admin_role_and_permissions, require_admin_auth,
@@ -421,7 +424,7 @@ def admin_me():
 
 @app.route('/admin/accounts', methods=['GET'])
 @require_admin_auth('admin.accounts.manage')
-@limiter.limit(RL_AUTH_ME)
+@limiter.limit(RL_READ_ADMIN)
 def admin_list_accounts():
     """List all admin_users accounts (owner-facing view)."""
     caller_id = g.admin_user_id
@@ -460,7 +463,7 @@ def admin_list_accounts():
 
 @app.route('/admin/accounts', methods=['POST'])
 @require_admin_auth('admin.accounts.manage')
-@limiter.limit(RL_AUTH_ME)
+@limiter.limit(RL_CATEGORY_WRITE)
 def admin_create_account():
     """Create a new admin_users account with an assigned role."""
     caller_id = g.admin_user_id
@@ -519,7 +522,7 @@ def admin_create_account():
 
 @app.route('/admin/accounts/<int:target_id>', methods=['DELETE'])
 @require_admin_auth('admin.accounts.manage')
-@limiter.limit(RL_AUTH_ME)
+@limiter.limit(RL_CATEGORY_WRITE)
 def admin_delete_account(target_id):
     """Deactivate (hard-delete) an admin account. Cannot delete your own."""
     caller_id = g.admin_user_id
@@ -556,7 +559,7 @@ def admin_delete_account(target_id):
 
 @app.route('/admin/accounts/<int:target_id>', methods=['PATCH'])
 @require_admin_auth('admin.accounts.manage')
-@limiter.limit(RL_AUTH_ME)
+@limiter.limit(RL_CATEGORY_WRITE)
 def admin_edit_account(target_id):
     """Change the role of an admin account. Cannot edit your own or accounts at/above your level."""
     caller_id = g.admin_user_id
@@ -612,7 +615,7 @@ def admin_edit_account(target_id):
 
 @app.route('/admin/accounts/<int:target_id>/reset-mfa', methods=['POST'])
 @require_admin_auth('admin.accounts.manage')
-@limiter.limit(RL_AUTH_ME)
+@limiter.limit(RL_ADMIN_SENSITIVE)
 def admin_reset_mfa(target_id):
     """Clear TOTP secret and enrolled flag — forces re-enrolment on next login."""
     caller_id = g.admin_user_id

@@ -20,7 +20,7 @@ and for the seed data / one-time backfill.
 from functools import wraps
 
 from flask import jsonify, request, g
-from flask_jwt_extended import get_jwt_identity, get_jwt, decode_token
+from flask_jwt_extended import get_jwt_identity, get_jwt, decode_token, jwt_required
 
 from database import get_connection, release_connection
 from hmac_auth import verify_hmac_request
@@ -123,6 +123,45 @@ def require_permission(permission_key):
                     return jsonify({'error': 'Not authorized'}), 403
             finally:
                 release_connection(conn)
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def require_auth(permission_key=None):
+    """Combined decorator for regular (non-admin) JWT routes. Bundles
+    @jwt_required() + optional permission check into one annotation so
+    the auth contract is declared in one place per route:
+
+        @app.route(...)
+        @require_auth('categories.rename')   # jwt + permission
+        @limiter.limit(RL_...)
+        def view():
+            ...
+
+    HMAC verification is handled upstream by the before_request hook in
+    extensions.py — this decorator does not need to repeat it.
+
+    Pass no argument (or None) for routes that need auth but have no
+    specific permission gate:
+
+        @require_auth()
+        @limiter.limit(RL_...)
+        def view():
+            ...
+    """
+    def decorator(fn):
+        @wraps(fn)
+        @jwt_required()
+        def wrapper(*args, **kwargs):
+            if permission_key:
+                current_user = int(get_jwt_identity())
+                conn = get_connection()
+                try:
+                    if not user_has_permission(conn, current_user, permission_key):
+                        return jsonify({'error': 'Not authorized'}), 403
+                finally:
+                    release_connection(conn)
             return fn(*args, **kwargs)
         return wrapper
     return decorator

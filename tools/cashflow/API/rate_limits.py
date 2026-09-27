@@ -181,8 +181,10 @@ RL_WRITE_PREFERENCES = _rl("500 per day", "DISABLE_RL_PREFERENCES_WRITE")
 RL_CATEGORY_WRITE = _rl("20 per day", "DISABLE_RL_CATEGORY_WRITE")
 # All category writes: rename, recolor, create, delete, combine, reorder,
 # reset-defaults, set-default-color + PATCH /admin/roles, PATCH/DELETE
-# admin users/credentials/permissions. Deliberate admin actions; 20/day is fine.
-# Used in: routes/categories.py (all writes), routes/admin.py (all writes)
+# admin users/credentials/permissions + POST/PATCH/DELETE /admin/accounts.
+# Deliberate admin actions; 20/day is fine.
+# Used in: routes/categories.py (all writes), routes/admin.py (all writes),
+#          routes/admin_auth.py (create/edit/delete admin accounts)
 
 
 # ── CATEGORISATION PIPELINE ──────────────────────────────────────────────────
@@ -212,7 +214,10 @@ RL_UPLOAD = _rl("50 per day", "DISABLE_RL_UPLOAD")
 RL_ADMIN_SENSITIVE = _rl("60 per hour", "DISABLE_RL_ADMIN_SENSITIVE")
 # POST /admin/tokens/revoke — token revocation. Legitimate use is rare
 # (one revoke per session); this blocks automated token-cycling abuse.
-# Used in: routes/admin.py (tokens/revoke), routes/auth.py (logout)
+# Also used for POST /admin/accounts/<id>/reset-mfa — MFA reset is a
+# sensitive irreversible action; 60/hour is more than enough.
+# Used in: routes/admin.py (tokens/revoke), routes/auth.py (logout),
+#          routes/admin_auth.py (reset-mfa)
 
 RL_ADMIN_UNLOCK = _rl("30 per hour", "DISABLE_RL_ADMIN_UNLOCK")
 # POST /admin/users/<id>/unlock — account unlock by admin+.
