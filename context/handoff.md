@@ -1,3 +1,13 @@
+## Pre-Compact Snapshot — 2026-09-27 15:59
+
+**Git HEAD:** `6de1cac`
+**Files touched:** (none — no uncommitted changes)
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
 ## Pre-Compact Snapshot — 2026-09-27 15:27
 
 **Git HEAD:** `a74070d`

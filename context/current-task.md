@@ -3,11 +3,24 @@
 
 ## Status (2026-09-27)
 
-No active task. admin.accounts.manage permission gate complete.
+No active task. Admin security sprint complete.
 
-**Next session:** Task 8 — Google/Microsoft OAuth. Note: auth now lives on the landing page, so OAuth buttons + callback routes go in landing, not Cashflow. Cashflow only needs RequireAuth to redirect to landing login on unauthenticated.
+**Completed this session:** Task 22 (geo-blocking + impossible travel + geo logs admin tab + HMAC/CSP/rate limit middleware). Tasks 27, 26, 23, 24 backlog status updated to done (were shipped 2026-09-23 but backlog not updated).
+
+**Next task:** Task 1 remaining work — `tools` JWT claim wiring + CORS lockdown to explicit origins only. This unblocks Task 5 (per-tool JWT gating) and the Stripe path. OAuth (Task 21/7/8) deferred — requires custom subdomain first.
 
 ## Recently Completed
+
+**Task 22 — Admin security hardening + geo-blocking (2026-09-27):**
+- HMAC request signing on all admin state-changing endpoints
+- CSP + security headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy)
+- Rate limit middleware restructure → middleware/ folder (admin_rate_limits.py, user_rate_limits.py, admin_middleware.py, user_middleware.py)
+- Geo-blocking: ADMIN_GEO_ALLOWLIST env var, country allowlist gating on login
+- Impossible travel detection: haversine + exponential strike lockout (15→30→60→120→240 min, permanent at 5 strikes), cached-fallback on ip-api.com failure
+- geo_lookup_log table + GET /admin/geo-logs endpoint (level-gated)
+- Geo Logs admin tab (dual-thumb date range slider, scrollable table, 90-day default)
+- Geo heartbeat POST /admin/geo/heartbeat every 10 min + on page focus
+- Stale .pyc cleared (RL_ADMIN_SENSITIVE NameError in routes/auth.py)
 
 **admin.accounts.manage permission gate (2026-09-27):**
 - Sidebar.jsx: Admin Accounts NavLink hidden unless owner or has admin.accounts.manage

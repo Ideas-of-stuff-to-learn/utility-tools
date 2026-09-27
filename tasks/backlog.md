@@ -13,7 +13,7 @@
 | Check-in | Date | Notes |
 |----------|------|-------|
 | 1 | 22 Sep 2026 | Ahead of schedule. Full auth system shipped (email verification, forgot/reset password, profile UI, soft-delete + 48h grace, account deletion email flow). Landing page live. Admin panel built (standalone Vite app, GitHub Pages). Roles/permissions/users management, impersonation log, category management all in admin panel. Task 2 ✓, Task 17 ✓, most of Task 21 ✓. |
-| 2 | 27 Sep 2026 | _(write update here)_ |
+| 2 | 27 Sep 2026 | Major admin security sprint complete. Tasks 27 ✓, 26 ✓, 23 ✓, 24 ✓ (all shipped 2026-09-23). Task 22 ✓ (HMAC signing, CSP/security headers, rate limit middleware refactor, geo-blocking + impossible travel detection + geo audit log — shipped 2026-09-27). Next: Task 1 remaining work (tools JWT claim wiring + CORS lockdown). |
 | 3 | 02 Oct 2026 | _(extended if needed)_ |
 
 > The deadline is an aim, not a hard constraint — extend if needed but keep the cadence.
@@ -26,14 +26,14 @@
 |---|------|----------|--------|------------|
 | [1](#1--auth-isolation--max-isolation-on-single-backend) | Auth isolation (max isolation, single backend) | 🔴 P1 | 1–2 weeks | High |
 | [2](#2--company-landing-page) | ~~Company landing page~~ | 🔴 P1 | 3–5 days | Medium |
-| [27](#27--admin-credential-isolation-separate-admin-user-accounts) | Admin credential isolation (separate admin accounts) | 🔴 P1 | 2–3 days | Medium |
-| [26](#26--admin-session-isolation-explicit-re-login-required) | Admin session isolation (explicit re-login) | 🔴 P1 | 1–2 days | Medium |
-| [22](#22--admin-panel-security-hardening) | Admin panel security hardening | 🔴 P1 | 1–2 weeks | High |
+| [27](#27--admin-credential-isolation-separate-admin-user-accounts) | ~~Admin credential isolation (separate admin accounts)~~ | 🔴 P1 | 2–3 days | Medium |
+| [26](#26--admin-session-isolation-explicit-re-login-required) | ~~Admin session isolation (explicit re-login)~~ | 🔴 P1 | 1–2 days | Medium |
+| [22](#22--admin-panel-security-hardening) | ~~Admin panel security hardening~~ | 🔴 P1 | 1–2 weeks | High |
 | [3](#3--stripe-billing-integration) | Stripe billing integration | 🔴 P1 | 1–2 weeks | High |
 | [4](#4--webhook-listener-subscription-status-sync) | Webhook listener (subscription sync) | 🔴 P1 | 3–5 days | High |
 | [5](#5--per-tool-jwt-access-gating) | Per-tool JWT access gating | 🟠 P2 | 3–5 days | High |
-| [23](#23--role-creation-level-ceiling) | Role creation level-ceiling | 🟠 P2 | 0.5–1 day | Low |
-| [24](#24--role-level-auto-calculation-from-permissions) | Role level auto-calculation from permissions | 🟠 P2 | 1–2 days | Medium |
+| [23](#23--role-creation-level-ceiling) | ~~Role creation level-ceiling~~ | 🟠 P2 | 0.5–1 day | Low |
+| [24](#24--role-level-auto-calculation-from-permissions) | ~~Role level auto-calculation from permissions~~ | 🟠 P2 | 1–2 days | Medium |
 | [25](#25--indexeddb-client-storage-layer) | IndexedDB client storage layer | 🟠 P2 | 1–2 weeks | High |
 | [6](#6--deployed-subdomain-linkage) | Deployed subdomain linkage | 🟠 P2 | 2–3 days | Medium |
 | [7](#7--free-trial-support) | Free trial support | 🟠 P2 | 2–3 days | Medium |
@@ -503,7 +503,7 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 
 ## 27 — Admin credential isolation (separate admin user accounts)
 
-**Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🔴 P1 &nbsp;·&nbsp; **Effort:** 2–3 days &nbsp;·&nbsp; **Complexity:** Medium  
+**Status:** `[x]` Done — 2026-09-23 &nbsp;·&nbsp; **Priority:** 🔴 P1 &nbsp;·&nbsp; **Effort:** 2–3 days &nbsp;·&nbsp; **Complexity:** Medium  
 **Do before Task 26** — credential isolation is the foundation; session isolation (Task 26) builds on top of it.
 
 **The requirement:** Admin panel accounts are a completely separate user base from Cashflow users. A Cashflow username + password cannot be entered on the admin panel login screen and succeed — they live in different tables and are checked against different credentials. A leaked Cashflow account gives zero admin access by definition.
@@ -552,7 +552,7 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 
 ## 26 — Admin session isolation (explicit re-login required)
 
-**Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🔴 P1 &nbsp;·&nbsp; **Effort:** 1–2 days &nbsp;·&nbsp; **Complexity:** Medium  
+**Status:** `[x]` Done — 2026-09-23 &nbsp;·&nbsp; **Priority:** 🔴 P1 &nbsp;·&nbsp; **Effort:** 1–2 days &nbsp;·&nbsp; **Complexity:** Medium  
 **Do before Task 22** — this is the most fundamental admin security property. All other hardening sits on top of it.
 
 **The problem (current behaviour):** The admin panel calls `GET /auth/me` with `credentials: 'include'`, which sends the same httpOnly cookie the landing page login sets. If you're logged in on the landing page as an owner-level account and navigate directly to the admin panel, the `getMe()` check succeeds and you are auto-logged in — no admin login required. This means a compromised landing session = compromised admin panel.
@@ -594,7 +594,8 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 
 ## 22 — Admin panel security hardening
 
-**Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🔴 P1 &nbsp;·&nbsp; **Effort:** 1–2 weeks &nbsp;·&nbsp; **Complexity:** High  
+**Status:** `[x]` Done — 2026-09-27 &nbsp;·&nbsp; **Priority:** 🔴 P1 &nbsp;·&nbsp; **Effort:** 1–2 weeks &nbsp;·&nbsp; **Complexity:** High  
+**Shipped:** HMAC request signing, CSP + security headers, rate limit middleware restructure (middleware/ folder), geo-blocking (country allowlist), impossible travel detection (exponential strike lockout), geo audit log admin tab, admin.accounts.manage permission gate, immutable admin_audit_log. IP whitelisting deferred — geo-based allowlist deemed sufficient at current scale.  
 **Why before Stripe:** The admin panel is owner-facing infrastructure. It must be hardened before billing goes live — an unsecured admin panel with access to user accounts and subscription controls is a critical pre-launch risk.
 
 **What it involves:**
@@ -617,7 +618,7 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 
 ## 23 — Role creation level-ceiling
 
-**Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🟠 P2 &nbsp;·&nbsp; **Effort:** 0.5–1 day &nbsp;·&nbsp; **Complexity:** Low  
+**Status:** `[x]` Done — 2026-09-23 &nbsp;·&nbsp; **Priority:** 🟠 P2 &nbsp;·&nbsp; **Effort:** 0.5–1 day &nbsp;·&nbsp; **Complexity:** Low  
 **Why:** The existing level-ceiling covers edit/delete/assign. Create is currently unrestricted — an admin-level user could create a role at or above owner level. This closes that gap to complete the hierarchy invariant.
 
 **The rule (same as edit/delete):** `new_role.level >= caller.level → 403`. The actor must be strictly higher than the role they're creating.
@@ -634,7 +635,7 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 
 ## 24 — Role level auto-calculation from permissions
 
-**Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🟠 P2 &nbsp;·&nbsp; **Effort:** 1–2 days &nbsp;·&nbsp; **Complexity:** Medium  
+**Status:** `[x]` Done — 2026-09-23 &nbsp;·&nbsp; **Priority:** 🟠 P2 &nbsp;·&nbsp; **Effort:** 1–2 days &nbsp;·&nbsp; **Complexity:** Medium  
 **Why:** Manual level entry is error-prone and disconnected from what the role actually does. Level should express the access a role grants, and access is defined by its permissions — so level should derive from permissions, not be entered independently.
 
 **What it involves:**
@@ -726,9 +727,9 @@ Safari Private Browsing and some iOS/Android browser configurations may deny IDB
 This checklist gates the first post to LinkedIn or any other public channel. Every item must be green before posting.
 
 ### Security & Auth (must-have before any unknown users sign up)
-- [ ] **Task 27 shipped** — separate `admin_users` table; Cashflow credentials cannot reach admin panel
-- [ ] **Task 26 shipped** — admin has its own session cookies, never auto-logged in from landing page
-- [ ] **Task 22 shipped** — IP whitelisting, HMAC signing, CSP headers, CSRF, immutable audit log
+- [x] **Task 27 shipped** — separate `admin_users` table; Cashflow credentials cannot reach admin panel
+- [x] **Task 26 shipped** — admin has its own session cookies, never auto-logged in from landing page
+- [x] **Task 22 shipped** — HMAC signing, CSP headers, CSRF (SameSite=Strict), rate limit middleware, geo-blocking, immutable audit log
 - [ ] **Task 1 shipped** — `tools` JWT claim in place, blueprint isolation confirmed, CORS locked to explicit origins
 - [ ] **Task 3 + 4 shipped** — Stripe billing + webhook listener live and tested end-to-end in Stripe test mode, then flipped to live keys
 - [ ] **Task 5 shipped** — per-tool JWT access gating enforced; 402 returned for non-subscribers
@@ -815,4 +816,5 @@ Hard launch means advertising to strangers: Product Hunt, tech communities, paid
 | 23 Sep 2026 | 🟢 Progressing well | ~45% | Auth system fully shipped: email verification, forgot/reset password, failed-attempt lockout, account deletion with 48h grace + cancellation. Brevo HTTP API for transactional email (SMTP blocked on Render). Platform restructure: landing page live, Cashflow moved to `tools/cashflow/`, dual deploy workflows. Admin panel built and deployed (standalone Vite + React, HashRouter, GitHub Pages at `/utility-tools/admin/`): roles management, users management, category management, impersonation/deletion logs. Task 2 ✓, Task 17 ✓, Task 21 partially ✓ (OAuth still pending). |
 | 24 Sep 2026 | 🟢 Progressing well | ~50% | Admin panel hardening: level-ceiling enforcement on all manipulation endpoints — no exceptions, no owner bypass (actor must be STRICTLY higher than target before and after). Email CC matrix: scheduled/cancelled/permanent deletion emails To: actor CC: owner. `pending_deletion_by_email` stored at schedule time so cron can email actor 48h later. Cancel emails added for roles and categories. Removed redundant `PROTECTED_ROLE_NAMES` check. Fixed `_get_owner_email` wrong join (`user_roles` doesn't exist — schema uses `users.role_id`). Migration `add_pending_deletion_by_email.sql` run on Supabase. Priority reorder confirmed: Stripe billing (Tasks 3+4) next, then React Native (Task 10), then OAuth (lowest). |
 | 26 Sep 2026 | 🟢 Planning | ~50% | Task backlog expanded: added Tasks 22 (admin security hardening), 23 (role creation ceiling), 24 (role level auto-calc from permissions), 25 (IndexedDB client storage with encryption + fallback). Priority reorder: 22 → 3+4 (Stripe) → 23+24 → 25 → 5+6 → 10 (RN) → 21 (OAuth). Wakeup spinner also wired to login form submit on both landing and admin. |
+| 27 Sep 2026 | 🟢 Progressing well | ~65% | Admin security sprint complete: Tasks 22 + 27 + 26 + 23 + 24 all shipped. Geo-blocking, impossible travel, geo audit log live on prod. Stale .pyc cleared (RL_ADMIN_SENSITIVE NameError). Next: Task 1 remaining (tools JWT claim + CORS lockdown).
 | 26 Sep 2026 | 🟢 Planning | ~50% | Added Soft Launch checklist (LinkedIn post gate) and Hard Launch checklist (full public / Product Hunt / ads) to backlog. Soft launch gates: Tasks 27+26+22+1+3+4+5 shipped, DEBUG=False, file validation, privacy page, ZAP scan, Dependabot. Hard launch adds: Render paid tier, Sentry, uptime monitoring, analytics, SEO meta tags, Stripe live keys + tax, incident runbook. |

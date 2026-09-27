@@ -64,3 +64,4 @@ Use `git revert` when changes have already been pushed to origin.
 2026-09-23 | task: security audit fixes — rate limits, auth vulns, categorisation data integrity, dead code | safe-point: 7b38603 | status: complete
 | 2026-09-24 | task: fix proxy IP rate limiting + ProxyFix + email flows | 5b8e64a3a4e2d946dddf3c925c47dd06acc33760 | in-progress |
 2026-09-24 | task: admin panel — standalone Vite app + backend user-transactions endpoint | safe-point: 62020347eb442529747c1f9e7ac15464edaf98f6 | status: in-progress
+2026-09-27 | task: backlog + context update (tasks 22/27/26/23/24 marked done) | safe-point: 6de1cac56a6f79097ab6a3359254dde918deb300 | status: complete
