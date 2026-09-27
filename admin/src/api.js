@@ -18,8 +18,12 @@ export function getIdbAdminUserId() { return _idbAdminUserId; }
 async function _setIdbKey(base64Dek, adminUserId) {
     try {
         const { importKey } = await import('./idb/crypto.js');
-        _idbCryptoKey    = await importKey(base64Dek);
-        _idbAdminUserId  = adminUserId;
+        _idbCryptoKey   = await importKey(base64Dek);
+        _idbAdminUserId = adminUserId;
+        // Eagerly open the DB so it appears in DevTools immediately,
+        // then write the admin user id as a stable preference entry.
+        const { put } = await import('./idb/store.js');
+        await put(adminUserId, 'preferences', 'admin_user_id', adminUserId, _idbCryptoKey);
     } catch (e) {
         console.warn('[AdminIDB] key import failed:', e.message);
     }

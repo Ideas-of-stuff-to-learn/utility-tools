@@ -128,7 +128,8 @@ export function TransactionsProvider({ children }) {
         setInitialLoadError(null);
         setAllTransactionsLoaded(false);
         setInitialLoading(true);
-        setTransactions([]);
+        // Do NOT wipe transactions here — IDB data stays visible during background
+        // refresh so charts never flash LoadingBarsPlaceholder on returning visits.
 
         const BATCH_SIZE = 500;
 
