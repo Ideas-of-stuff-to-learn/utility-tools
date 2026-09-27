@@ -6,6 +6,7 @@ compute_role_level() is the single source of truth for derived role levels.
 
 PERMISSION_WEIGHTS = {
     'admin.panel.view':              6,
+    'admin.accounts.manage':        33,
     'categories.create':             2,
     'categories.rename':             3,
     'categories.recolor':            4,

@@ -415,7 +415,7 @@ def admin_me():
 # ── Admin-accounts management endpoints ───────────────────────────────────────
 
 @app.route('/admin/accounts', methods=['GET'])
-@require_admin_auth('users.view')
+@require_admin_auth('admin.accounts.manage')
 @limiter.limit(RL_AUTH_ME)
 def admin_list_accounts():
     """List all admin_users accounts (owner-facing view)."""
@@ -454,7 +454,7 @@ def admin_list_accounts():
 
 
 @app.route('/admin/accounts', methods=['POST'])
-@require_admin_auth('users.create')
+@require_admin_auth('admin.accounts.manage')
 @limiter.limit(RL_AUTH_ME)
 def admin_create_account():
     """Create a new admin_users account with an assigned role."""
@@ -513,7 +513,7 @@ def admin_create_account():
 
 
 @app.route('/admin/accounts/<int:target_id>', methods=['DELETE'])
-@require_admin_auth('users.delete')
+@require_admin_auth('admin.accounts.manage')
 @limiter.limit(RL_AUTH_ME)
 def admin_delete_account(target_id):
     """Deactivate (hard-delete) an admin account. Cannot delete your own."""

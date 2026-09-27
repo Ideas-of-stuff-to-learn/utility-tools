@@ -11,6 +11,8 @@ export default function Sidebar({ user, onLogout }) {
     const role = user?.role || '';
     const level = user?.level ?? 0;
     const canSeeAudit = user?.role === 'owner' || level >= AUDIT_MIN;
+    const perms = user?.permissions || [];
+    const canManageAccounts = user?.role === 'owner' || perms.includes('admin.accounts.manage');
 
     return (
         <nav className="admin-sidebar">
@@ -24,7 +26,7 @@ export default function Sidebar({ user, onLogout }) {
             <div className="admin-sidebar-section">General</div>
             <NavLink className="admin-nav-item" to="/general/users">Users</NavLink>
             <NavLink className="admin-nav-item" to="/general/roles">Roles &amp; Permissions</NavLink>
-            <NavLink className="admin-nav-item" to="/general/admin-accounts">Admin Accounts</NavLink>
+            {canManageAccounts && <NavLink className="admin-nav-item" to="/general/admin-accounts">Admin Accounts</NavLink>}
             <NavLink className="admin-nav-item" to="/general/unlock">Unlock Account</NavLink>
             {canSeeAudit && <NavLink className="admin-nav-item" to="/general/impersonation-log">Impersonation Log</NavLink>}
             {canSeeAudit && <NavLink className="admin-nav-item" to="/general/audit-log">Audit Log</NavLink>}

@@ -4,6 +4,7 @@
  */
 export const PERMISSION_WEIGHTS = {
     'admin.panel.view':              6,
+    'admin.accounts.manage':        33,
     'categories.create':             2,
     'categories.rename':             3,
     'categories.recolor':            4,

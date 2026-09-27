@@ -390,6 +390,13 @@ INSERT INTO permissions (key, description) VALUES
 ON CONFLICT (key) DO NOTHING;
 
 -- =====================================================================
+-- Admin accounts management permission
+-- =====================================================================
+INSERT INTO permissions (key, description) VALUES
+    ('admin.accounts.manage', 'View, create, and delete admin panel accounts')
+ON CONFLICT (key) DO NOTHING;
+
+-- =====================================================================
 -- Admin credential isolation (Task 27, 2026-09-26)
 -- admin_users is a completely separate identity space from users.
 -- Cashflow credentials cannot reach admin panel routes.

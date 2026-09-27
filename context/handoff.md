@@ -1,3 +1,13 @@
+## Pre-Compact Snapshot — 2026-09-27 01:44
+
+**Git HEAD:** `5475406`
+**Files touched:** admin/src/components/Sidebar.jsx, tools/cashflow/API/permission_weights.py, tools/cashflow/API/schema.sql, admin/src/utils/permissionWeights.js, tools/cashflow/API/routes/admin_auth.py
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
 ## 2026-09-27 — Admin panel shipped + permission-derived role levels
 
 **Git HEAD:** `060a206` (main, pushed)
