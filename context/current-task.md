@@ -7,9 +7,17 @@ No active task. Admin security sprint complete.
 
 **Completed this session:** Task 22 (geo-blocking + impossible travel + geo logs admin tab + HMAC/CSP/rate limit middleware). Tasks 27, 26, 23, 24 backlog status updated to done (were shipped 2026-09-23 but backlog not updated).
 
-**Next task:** Task 1 remaining work — `tools` JWT claim wiring + CORS lockdown to explicit origins only. This unblocks Task 5 (per-tool JWT gating) and the Stripe path. OAuth (Task 21/7/8) deferred — requires custom subdomain first.
+**Next task:** Task 25 (IndexedDB client storage) or Task 10 (React Native update) — both unblock Task 5 (per-tool gating enforcement) once Stripe is live. OAuth deferred (needs custom subdomain).
 
 ## Recently Completed
+
+**Task 1 remaining — tools JWT claim wiring (2026-09-27):**
+- routes/auth.py: login + signup issue tokens with tools=['cashflow']; refresh carries claim forward
+- middleware/user_middleware.py: require_auth() now checks tools claim (strict — 403 if missing)
+- All 22 bare @jwt_required() in cashflow routes → @require_auth()
+- CORS audited clean (locked to github.io in prod). Blueprint isolation audited clean.
+- Strict enforcement: existing logged-in users get 403 until they log in again (intentional)
+- Shipped 64d141f
 
 **Task 22 — Admin security hardening + geo-blocking (2026-09-27):**
 - HMAC request signing on all admin state-changing endpoints
