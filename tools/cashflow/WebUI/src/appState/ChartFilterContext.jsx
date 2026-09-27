@@ -1,17 +1,30 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { getChartSummary, getIdbKey, getIdbUserId } from '../api';
-import { get as idbGet, put as idbPut } from '../idb/store';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { useTransactions } from './TransactionsContext';
+import { NEEDS_MANUAL_REVIEW, NOT_YET_CATEGORISED } from '../checkingName';
 
 const ChartFilterContext = createContext();
 
+// Category values that are placeholder/transient — excluded from chart aggregation.
+// Must stay in sync with server-side TRANSIENT_CATEGORY_VALUES in API/shared.py.
+const EXCLUDED_CATEGORIES = new Set([NEEDS_MANUAL_REVIEW, NOT_YET_CATEGORISED, 'PENDING_LLM']);
+
+// Regex matching the DD/MM/YYYY date format stored in the DB.
+const DATE_RE = /^\d{2}\/\d{2}\/\d{4}$/;
+
 export function ChartFilterProvider({ children }) {
     const { isLoggedIn } = useAuth();
-    const { categoryNames } = useTransactions();
+    const { categoryNames, transactions } = useTransactions();
 
-    const [chartSummary, setChartSummary] = useState({ yearly: [], monthly: [] });
+    // chartDataVersion / bumpChartDataVersion are kept for backward
+    // compatibility — they are called from ~10 call sites after uploads
+    // and categorization. With chartSummary now derived from transactions
+    // via useMemo, bumping the version is no longer needed to trigger a
+    // refetch, but keeping it as a no-op avoids touching every call site.
     const [chartDataVersion, setChartDataVersion] = useState(0);
+    const bumpChartDataVersion = useCallback(() => {
+        setChartDataVersion(t => t + 1);
+    }, []);
 
     const [contentsSelectedCategories, setContentsSelectedCategories] = useState(new Set());
     const seenContentsCategoriesRef = useRef(new Set());
@@ -19,9 +32,43 @@ export function ChartFilterProvider({ children }) {
     const [mobileSelectedCategories, setMobileSelectedCategories] = useState(new Set());
     const seenMobileCategoriesRef = useRef(new Set());
 
-    const bumpChartDataVersion = useCallback(() => {
-        setChartDataVersion(t => t + 1);
-    }, []);
+    // Derive chart summary directly from transactions — same GROUP BY
+    // aggregation that /charts/summary runs server-side, but done
+    // client-side so it's instant for returning users (transactions load
+    // from IDB) and stays automatically in sync when transactions change
+    // after uploads or categorization.
+    const chartSummary = useMemo(() => {
+        if (!transactions || transactions.length === 0) return { yearly: [], monthly: [] };
+
+        const yearlyMap = new Map();
+        const monthlyMap = new Map();
+
+        for (const t of transactions) {
+            if (!t.category || EXCLUDED_CATEGORIES.has(t.category)) continue;
+            const date = t.date;
+            if (!DATE_RE.test(date)) continue;
+
+            const year  = parseInt(date.slice(6, 10), 10);
+            const month = parseInt(date.slice(3, 5), 10);
+            const amount = Math.abs(parseFloat(t.amount) || 0);
+
+            // yearly aggregate
+            const yk = `${year}\x00${t.category}`;
+            let yr = yearlyMap.get(yk);
+            if (!yr) { yr = { year, category: t.category, total: 0 }; yearlyMap.set(yk, yr); }
+            yr.total += amount;
+
+            // monthly aggregate
+            const mk = `${year}\x00${month}\x00${t.category}`;
+            let mo = monthlyMap.get(mk);
+            if (!mo) { mo = { year, month, category: t.category, total: 0 }; monthlyMap.set(mk, mo); }
+            mo.total += amount;
+        }
+
+        const yearly  = [...yearlyMap.values()].sort((a, b) => a.year - b.year);
+        const monthly = [...monthlyMap.values()].sort((a, b) => a.year - b.year || a.month - b.month);
+        return { yearly, monthly };
+    }, [transactions]);
 
     const toggleContentsCategory = useCallback((cat) => {
         setContentsSelectedCategories(prev => {
@@ -50,55 +97,6 @@ export function ChartFilterProvider({ children }) {
             prev.size >= allCategoryNames.length ? new Set() : new Set(allCategoryNames)
         );
     }, []);
-
-    // Fetch chart summary whenever data version bumps or login state changes.
-    // On every login, restore chartSummary from IDB first so hasData=true
-    // instantly for returning users — the server fetch then updates silently.
-    useEffect(() => {
-        if (!isLoggedIn) return;
-        let cancelled = false;
-
-        async function run() {
-            // IDB warm-start: restore cached summary before network round-trip
-            const cryptoKey = getIdbKey();
-            const userId    = getIdbUserId();
-            if (cryptoKey && userId) {
-                try {
-                    const cached = await idbGet(userId, 'preferences', 'chart_summary', cryptoKey);
-                    if (!cancelled && cached && Array.isArray(cached.yearly) && cached.yearly.length > 0) {
-                        setChartSummary(cached);
-                    }
-                } catch (_) { /* IDB unavailable — fall through to server */ }
-            }
-
-            // Background server fetch — always runs to keep data fresh
-            async function fetchWithRetry(attempt = 1) {
-                try {
-                    const data = await getChartSummary();
-                    if (!cancelled) {
-                        setChartSummary(data);
-                        // Persist for next visit so charts render instantly
-                        if (cryptoKey && userId) {
-                            idbPut(userId, 'preferences', 'chart_summary', data, cryptoKey).catch(() => {});
-                        }
-                    }
-                } catch (e) {
-                    if (attempt >= 3) {
-                        console.warn(`Failed to load chart summary after ${attempt} attempts:`, e.message);
-                        return;
-                    }
-                    const delayMs = 1000 * attempt;
-                    await new Promise(resolve => setTimeout(resolve, delayMs));
-                    if (!cancelled) await fetchWithRetry(attempt + 1);
-                }
-            }
-
-            await fetchWithRetry();
-        }
-
-        run();
-        return () => { cancelled = true; };
-    }, [chartDataVersion, isLoggedIn]);
 
     // Auto-select newly arriving category names in contents filter
     useEffect(() => {
