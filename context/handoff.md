@@ -1,3 +1,23 @@
+## Pre-Compact Snapshot — 2026-09-28 00:00
+
+**Git HEAD:** `fa5417b`
+**Files touched:** context/savings-log.md, context/session-snapshot.md, context/revert-state.md, context/handoff.md
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
+## Pre-Compact Snapshot — 2026-09-27 23:29
+
+**Git HEAD:** `7d23ce3`
+**Files touched:** context/revert-state.md, context/savings-log.md
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
 ## Pre-Compact Snapshot — 2026-09-27 21:29
 
 **Git HEAD:** `51f17ef`

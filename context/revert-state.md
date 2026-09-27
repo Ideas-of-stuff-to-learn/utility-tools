@@ -72,4 +72,7 @@ Use `git revert` when changes have already been pushed to origin.
 2026-09-27 | task: chart rAF gate — tie to hasData to eliminate oscillation | safe-point: 4cb760313736129cdda116c2b065d81a19d691d3 | status: complete
 2026-09-27 | task: cache chartSummary in IDB — eliminate getChartSummary server wait | safe-point: 5d77a780bd576d72c69d669763b31ea555a708be | status: complete
 2026-09-27 | task: derive chartSummary from transactions useMemo — eliminate server fetch | safe-point: 78b6d144d7061028f77fdc2cf482493848da5f32 | status: complete
-2026-09-27 | task: two-phase IDB chart warm-start — single blob read before txn decryption | safe-point: 1b5e3d60026a16854f499b5e53ed347e0e77aa83 | status: in-progress
+2026-09-27 | task: two-phase IDB chart warm-start — single blob read before txn decryption | safe-point: 1b5e3d60026a16854f499b5e53ed347e0e77aa83 | status: complete
+2026-09-27 | task: canvas chart renderer + idbReady race fix + full IDB chart persistence | safe-point: f87235b | status: complete
+2026-09-27 | task: fix React #310 hooks order in StackChartCanvas — move early return after hooks | safe-point: 7d23ce3 | status: complete
+2026-09-28 | task: fix oscillation — idbReady re-run flashes spinner + auth/me 500 + AESGCM keyword arg | safe-point: fa5417b69fd6bcbea7f7805a5f89dc3d68d373a6 | status: in-progress

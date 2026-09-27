@@ -68,6 +68,7 @@ def auth_me():
         role_name, level, perms = get_user_role_and_permissions(conn, current_user)
         access_cookie  = request.cookies.get('access_token_cookie')
         refresh_cookie = request.cookies.get('refresh_token_cookie')
+        access_jti = get_jwt().get('jti', '')
         return jsonify({
             'id': current_user,
             'username': username,
@@ -81,6 +82,7 @@ def auth_me():
             'csrf_access_token':  get_csrf_token(access_cookie)  if access_cookie  else None,
             'csrf_refresh_token': get_csrf_token(refresh_cookie) if refresh_cookie else None,
             'idb_key': get_or_create_dek(conn, current_user),
+            'hmac_signing_secret': derive_signing_secret(str(current_user), access_jti),
         }), 200
     except Exception as e:
         app.logger.error(f'Fetching own identity failed for user {current_user}: {e}')

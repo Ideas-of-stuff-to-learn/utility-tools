@@ -87,6 +87,14 @@ export function TransactionsProvider({ children }) {
     const [initialLoadError, setInitialLoadError] = useState(null);
     const [loadRetryCount, setLoadRetryCount] = useState(0);
 
+    // Tracks whether we have already completed a successful initial load.
+    // Prevents the idbReady-triggered re-run from flashing the spinner again
+    // when transactions are already visible. Reset when the user logs out.
+    const firstLoadDoneRef = useRef(false);
+    useEffect(() => {
+        if (!isLoggedIn) firstLoadDoneRef.current = false;
+    }, [isLoggedIn]);
+
     const categoryNames = useMemo(() => categories.map(c => c.name), [categories]);
     const categoryColors = useMemo(() => Object.fromEntries(categories.map(c => [c.name, c.color])), [categories]);
 
@@ -127,7 +135,9 @@ export function TransactionsProvider({ children }) {
 
         setInitialLoadError(null);
         setAllTransactionsLoaded(false);
-        setInitialLoading(true);
+        // Skip the spinner if we already completed a first load (idbReady re-trigger).
+        // On a genuine retry (loadRetryCount > 0) or first load, show the spinner.
+        if (!firstLoadDoneRef.current) setInitialLoading(true);
         // Do NOT wipe transactions here — IDB data stays visible during background
         // refresh so charts never flash LoadingBarsPlaceholder on returning visits.
 
@@ -221,6 +231,7 @@ export function TransactionsProvider({ children }) {
 
                 if (!cancelled) {
                     setAllTransactionsLoaded(true);
+                    firstLoadDoneRef.current = true;
 
                     let flushedPicks = [];
                     try {

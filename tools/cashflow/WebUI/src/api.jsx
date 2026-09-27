@@ -370,6 +370,7 @@ export async function getMe() {
     const data = await parseJsonResponse(response, 'Failed to fetch account info');
     if (data.csrf_access_token) csrfAccessToken = data.csrf_access_token;
     if (data.csrf_refresh_token) csrfRefreshToken = data.csrf_refresh_token;
+    if (data.hmac_signing_secret) hmacSigningSecret = data.hmac_signing_secret;
     if (data.idb_key && data.id) await _setIdbKey(data.idb_key, data.id);
     return data;
 }
