@@ -33,6 +33,13 @@
 - `ADMIN_ACCOUNT_MIN_LEVEL=30`
 - `ADMIN_LEVEL_OVERRIDE_MIN=80`
 
+### Global admin audit log (ffdc157)
+- `admin_audit_log` table + `audit.py` shared writer
+- Writes on: roles.create/edit/delete, users.assign_role, users.impersonate, admin.account.create/delete
+- `GET /admin/audit` — filterable by actor + action, gated by `ADMIN_AUDIT_MIN_LEVEL=60`
+- `AuditLogScreen.jsx` — filterable table in sidebar (hidden below audit min level)
+- Supabase SQL run by user ✓ | Render env var `ADMIN_AUDIT_MIN_LEVEL=60` added ✓
+
 ### Still to do / open
 - Delete the "admin" role from Supabase (randomly created, no one using it):
   ```sql
