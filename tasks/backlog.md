@@ -34,7 +34,7 @@
 | [5](#5--per-tool-jwt-access-gating) | Per-tool JWT access gating | 🟠 P2 | 3–5 days | High |
 | [23](#23--role-creation-level-ceiling) | ~~Role creation level-ceiling~~ | 🟠 P2 | 0.5–1 day | Low |
 | [24](#24--role-level-auto-calculation-from-permissions) | ~~Role level auto-calculation from permissions~~ | 🟠 P2 | 1–2 days | Medium |
-| [25](#25--indexeddb-client-storage-layer) | IndexedDB client storage layer | 🟠 P2 | 1–2 weeks | High |
+| [~~25~~](#25--indexeddb-client-storage-layer) | ~~IndexedDB client storage layer~~ | 🟠 P2 | 1–2 weeks | High |
 | [6](#6--deployed-subdomain-linkage) | Deployed subdomain linkage | 🟠 P2 | 2–3 days | Medium |
 | [7](#7--free-trial-support) | Free trial support | 🟠 P2 | 2–3 days | Medium |
 | [8](#8--stripe-customer-portal-self-service) | Stripe Customer Portal (self-service) | 🟠 P2 | 1–2 days | Low |
@@ -653,7 +653,7 @@ Full audit of every modal, popup, and overlay in the WebUI (all 17 CSS files + 4
 
 ## 25 — IndexedDB client storage layer
 
-**Status:** `[ ]` &nbsp;·&nbsp; **Priority:** 🟠 P2 &nbsp;·&nbsp; **Effort:** 1–2 weeks &nbsp;·&nbsp; **Complexity:** High  
+**Status:** `[x]` done 2026-09-27 &nbsp;·&nbsp; **Priority:** 🟠 P2 &nbsp;·&nbsp; **Effort:** 1–2 weeks &nbsp;·&nbsp; **Complexity:** High  
 **Why before Stripe:** Stripe checkout and subscription state benefit from robust client-side persistence. IndexedDB also gives native encryption — sensitive preference data and cached transaction records shouldn't sit in plaintext localStorage.
 
 **What it involves:**
@@ -816,5 +816,6 @@ Hard launch means advertising to strangers: Product Hunt, tech communities, paid
 | 23 Sep 2026 | 🟢 Progressing well | ~45% | Auth system fully shipped: email verification, forgot/reset password, failed-attempt lockout, account deletion with 48h grace + cancellation. Brevo HTTP API for transactional email (SMTP blocked on Render). Platform restructure: landing page live, Cashflow moved to `tools/cashflow/`, dual deploy workflows. Admin panel built and deployed (standalone Vite + React, HashRouter, GitHub Pages at `/utility-tools/admin/`): roles management, users management, category management, impersonation/deletion logs. Task 2 ✓, Task 17 ✓, Task 21 partially ✓ (OAuth still pending). |
 | 24 Sep 2026 | 🟢 Progressing well | ~50% | Admin panel hardening: level-ceiling enforcement on all manipulation endpoints — no exceptions, no owner bypass (actor must be STRICTLY higher than target before and after). Email CC matrix: scheduled/cancelled/permanent deletion emails To: actor CC: owner. `pending_deletion_by_email` stored at schedule time so cron can email actor 48h later. Cancel emails added for roles and categories. Removed redundant `PROTECTED_ROLE_NAMES` check. Fixed `_get_owner_email` wrong join (`user_roles` doesn't exist — schema uses `users.role_id`). Migration `add_pending_deletion_by_email.sql` run on Supabase. Priority reorder confirmed: Stripe billing (Tasks 3+4) next, then React Native (Task 10), then OAuth (lowest). |
 | 26 Sep 2026 | 🟢 Planning | ~50% | Task backlog expanded: added Tasks 22 (admin security hardening), 23 (role creation ceiling), 24 (role level auto-calc from permissions), 25 (IndexedDB client storage with encryption + fallback). Priority reorder: 22 → 3+4 (Stripe) → 23+24 → 25 → 5+6 → 10 (RN) → 21 (OAuth). Wakeup spinner also wired to login form submit on both landing and admin. |
-| 27 Sep 2026 | 🟢 Progressing well | ~65% | Admin security sprint complete: Tasks 22 + 27 + 26 + 23 + 24 all shipped. Geo-blocking, impossible travel, geo audit log live on prod. Stale .pyc cleared (RL_ADMIN_SENSITIVE NameError). Next: Task 1 remaining (tools JWT claim + CORS lockdown).
+| 27 Sep 2026 | 🟢 Progressing well | ~65% | Admin security sprint complete: Tasks 22 + 27 + 26 + 23 + 24 all shipped. Geo-blocking, impossible travel, geo audit log live on prod. Stale .pyc cleared (RL_ADMIN_SENSITIVE NameError). Task 1 JWT claim wiring + HMAC login fix shipped.
+| 27 Sep 2026 | 🟢 Progressing well | ~72% | Task 25 shipped: AES-256-GCM encrypted IndexedDB with envelope encryption (KEK env + DEK per-user table). Write queue with optimistic updates + rollback. Staleness-based rehydration for transactions/categories/upload_stats. localStorage fully removed from preferences. Supabase migration + Render env var added. |
 | 26 Sep 2026 | 🟢 Planning | ~50% | Added Soft Launch checklist (LinkedIn post gate) and Hard Launch checklist (full public / Product Hunt / ads) to backlog. Soft launch gates: Tasks 27+26+22+1+3+4+5 shipped, DEBUG=False, file validation, privacy page, ZAP scan, Dependabot. Hard launch adds: Render paid tier, Sentry, uptime monitoring, analytics, SEO meta tags, Stripe live keys + tax, incident runbook. |

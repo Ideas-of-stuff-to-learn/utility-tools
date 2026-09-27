@@ -20,6 +20,7 @@ import bcrypt
 
 from extensions import app, limiter
 from hmac_auth import derive_signing_secret
+from crypto.idb_keys import get_or_create_dek
 from middleware.user_rate_limits import (
     RL_AUTH_ME, RL_AUTH_LOGIN, RL_AUTH_SIGNUP, RL_AUTH_REFRESH,
     RL_AUTH_LOGOUT, RL_AUTH_EMAIL_SEND, RL_AUTH_FORGOT_PASSWORD,
@@ -66,6 +67,7 @@ def auth_me():
         pending_email = row[4] if row else None
         role_name, level, perms = get_user_role_and_permissions(conn, current_user)
         return jsonify({
+            'id': current_user,
             'username': username,
             'email': email,
             'email_verified': email_verified,
@@ -76,6 +78,7 @@ def auth_me():
             'permissions': sorted(perms),
             'csrf_access_token': get_csrf_token(request.cookies.get('access_token_cookie')),
             'csrf_refresh_token': get_csrf_token(request.cookies.get('refresh_token_cookie')),
+            'idb_key': get_or_create_dek(conn, current_user),
         }), 200
     except Exception as e:
         app.logger.error(f'Fetching own identity failed for user {current_user}: {e}')
@@ -737,11 +740,13 @@ def login():
         )
         access_jti = decode_token(access_token)['jti']
         resp = jsonify({
+            'user_id': user_id,
             'access_token': access_token,
             'refresh_token': refresh_token,
             'csrf_access_token': get_csrf_token(access_token),
             'csrf_refresh_token': get_csrf_token(refresh_token),
             'hmac_signing_secret': derive_signing_secret(str(user_id), access_jti),
+            'idb_key': get_or_create_dek(conn, user_id),
         })
         set_access_cookies(resp, access_token)
         set_refresh_cookies(resp, refresh_token)
@@ -822,11 +827,13 @@ def signup():
         )
         access_jti = decode_token(access_token)['jti']
         resp = jsonify({
+            'user_id': new_id,
             'access_token': access_token,
             'refresh_token': refresh_token,
             'csrf_access_token': get_csrf_token(access_token),
             'csrf_refresh_token': get_csrf_token(refresh_token),
             'hmac_signing_secret': derive_signing_secret(str(new_id), access_jti),
+            'idb_key': get_or_create_dek(conn, new_id),
         })
         set_access_cookies(resp, access_token)
         set_refresh_cookies(resp, refresh_token)

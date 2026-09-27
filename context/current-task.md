@@ -3,13 +3,26 @@
 
 ## Status (2026-09-27)
 
-No active task. Admin security sprint complete.
+No active task. Task 25 (encrypted IndexedDB) complete.
 
-**Completed this session:** Task 22 (geo-blocking + impossible travel + geo logs admin tab + HMAC/CSP/rate limit middleware). Tasks 27, 26, 23, 24 backlog status updated to done (were shipped 2026-09-23 but backlog not updated).
+**Completed this session:** Task 25 — AES-256-GCM encrypted IndexedDB layer with envelope encryption (KEK in env, DEK in user_idb_keys table), write queue, staleness-based rehydration. Also Task 1 JWT wiring + HMAC login fix.
 
-**Next task:** Task 25 (IndexedDB client storage) or Task 10 (React Native update) — both unblock Task 5 (per-tool gating enforcement) once Stripe is live. OAuth deferred (needs custom subdomain).
+**Next task:** Task 10 (React Native update — last) or Tasks 3+4 (Stripe billing, P1 Critical).
 
 ## Recently Completed
+
+**Task 25 — Encrypted IndexedDB layer (2026-09-27):**
+- Envelope encryption: KEK in `IDB_MASTER_KEY` env var, per-user DEK in `user_idb_keys` table (AES-256-GCM encrypted)
+- New `crypto/idb_keys.py` — get_or_create_dek(), encrypt/decrypt DEK with KEK
+- `user_idb_keys` migration + blocklist on PUT /preferences for `idb_key`
+- `/auth/login`, `/auth/signup`, `/auth/me` all return `idb_key` + `user_id`
+- Frontend `src/idb/`: `crypto.js` (AES-256-GCM), `store.js` (per-user DB `cashflow-db-{userId}`, 6 stores, staleness API), `writeQueue.js` (optimistic drain + rollback + auto-drain on focus/online)
+- `api.jsx`: imports DEK on login/signup/getMe, nulls key + flushes queue on logout (IDB blobs persist)
+- `UserPreferencesContext.jsx`: IDB instant hydration → server authoritative in background; removed all localStorage
+- `TransactionsContext.jsx`: IDB cache hydration + staleness check + `optimisticUpdateTransactions` helper
+- `GET /categories` now returns `version` field for staleness detection
+- `theme.js` + `useThemeSync.js`: kept on localStorage (non-sensitive, synchronous boot requirement)
+- Shipped: (pending)
 
 **Task 1 remaining — tools JWT claim wiring (2026-09-27):**
 - routes/auth.py: login + signup issue tokens with tools=['cashflow']; refresh carries claim forward

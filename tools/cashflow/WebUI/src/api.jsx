@@ -1,6 +1,8 @@
 import {url} from '../../frontendLocalConfig'
 import { simulateColdStart, coldStartSimulatedSeconds } from '../../devConfig'
 import { UPLOAD_WINDOW_MODE, UPLOAD_WINDOW_DURATION_VALUE, UPLOAD_WINDOW_DURATION_UNIT } from './config/uploadWindowConfig';
+import { importKey } from './idb/crypto.js';
+import { clearQueue, initQueue } from './idb/writeQueue.js';
 
 
 const BASE_URL = url;
@@ -21,6 +23,22 @@ const COLD_START_TIMEOUT_MS = 70000;
 let csrfAccessToken   = null;
 let csrfRefreshToken  = null;
 let hmacSigningSecret = null;  // hex string, held in JS memory only
+let idbCryptoKey      = null;  // AES-256-GCM CryptoKey, held in JS memory only
+let idbUserId         = null;  // current user's id, needed for store paths
+
+async function _setIdbKey(base64Dek, userId) {
+    try {
+        idbCryptoKey = await importKey(base64Dek);
+        idbUserId    = userId;
+        initQueue(userId, idbCryptoKey);
+    } catch {
+        idbCryptoKey = null;
+        idbUserId    = null;
+    }
+}
+
+export function getIdbKey()    { return idbCryptoKey; }
+export function getIdbUserId() { return idbUserId; }
 
 async function computeHmacHeaders(method, path) {
     if (!hmacSigningSecret) return {};
@@ -318,6 +336,7 @@ export async function signup(username, password, email) {
     csrfAccessToken  = data.csrf_access_token;
     csrfRefreshToken = data.csrf_refresh_token;
     if (data.hmac_signing_secret) hmacSigningSecret = data.hmac_signing_secret;
+    if (data.idb_key && data.user_id) await _setIdbKey(data.idb_key, data.user_id);
     return data;
 }
 
@@ -335,6 +354,7 @@ export async function login(identifier, password, elapsedMs) {
     csrfAccessToken  = data.csrf_access_token;
     csrfRefreshToken = data.csrf_refresh_token;
     if (data.hmac_signing_secret) hmacSigningSecret = data.hmac_signing_secret;
+    if (data.idb_key && data.user_id) await _setIdbKey(data.idb_key, data.user_id);
     return data;
 }
 
@@ -350,6 +370,7 @@ export async function getMe() {
     const data = await parseJsonResponse(response, 'Failed to fetch account info');
     if (data.csrf_access_token) csrfAccessToken = data.csrf_access_token;
     if (data.csrf_refresh_token) csrfRefreshToken = data.csrf_refresh_token;
+    if (data.idb_key && data.id) await _setIdbKey(data.idb_key, data.id);
     return data;
 }
 // Actually revokes the current session server-side now (see
@@ -387,6 +408,12 @@ export async function logout() {
     csrfAccessToken   = null;
     csrfRefreshToken  = null;
     hmacSigningSecret = null;
+    // Flush any pending write queue entries, then null the key.
+    // IDB blobs stay on disk (still encrypted) — they become readable again
+    // on next login when the server re-issues the same DEK.
+    if (idbUserId) clearQueue(idbUserId);
+    idbCryptoKey = null;
+    idbUserId    = null;
 }
 
 export async function updateProfile(fields) {

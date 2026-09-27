@@ -36,6 +36,8 @@ def get_categories():
                 "SELECT name, color, default_color, pending_deletion_at FROM categories ORDER BY display_order"
             )
             rows = cur.fetchall()
+            cur.execute("SELECT COUNT(*) + COALESCE(MAX(id), 0) FROM categories")
+            version = cur.fetchone()[0]
 
         categories = [
             {
@@ -44,7 +46,7 @@ def get_categories():
             }
             for row in rows
         ]
-        return jsonify({'categories': categories}), 200
+        return jsonify({'categories': categories, 'version': version}), 200
     except Exception as e:
         app.logger.error(f'Fetching categories failed: {e}')
         return jsonify({'error': 'Failed to fetch categories'}), 500

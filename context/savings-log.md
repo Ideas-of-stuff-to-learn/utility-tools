@@ -1,4 +1,5 @@
 <!-- last-verified: 7e49833 2026-09-24 -->
+2026-09-27 | task: Task 25 — encrypted IndexedDB layer | SQLite queries: 0 | context docs loaded: 3 (current-task, backlog, plan) | full repo scan avoided: yes | 8 source files created/changed, 1 migration, Supabase + Render env updated
 2026-09-27 | task: admin.accounts.manage permission gate (sidebar + backend + weights) | SQLite queries: 0 | context docs loaded: 2 (compacted session summary, Sidebar.jsx) | full repo scan avoided: yes | resumed from compaction; 5 source files + 2 context docs changed
 2026-09-26 | task: add soft-launch + hard-launch checklists to backlog | SQLite queries: 0 | context docs loaded: 2 (backlog, revert-state) | full repo scan avoided: yes | docs-only update; no source code touched
 2026-09-24 | task: backlog update — check-in 1, task 17 done, daily log 23-24 Sep | SQLite queries: 0 | context docs loaded: 3 (revert-state, savings-log, backlog) | full repo scan avoided: yes | compacted session resume; docs-only update

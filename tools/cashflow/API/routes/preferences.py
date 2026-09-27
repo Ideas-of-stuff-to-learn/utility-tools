@@ -49,6 +49,10 @@ def put_preferences():
     if not isinstance(updates, dict):
         return jsonify({'error': 'Body must be a JSON object'}), 400
 
+    # idb_key is managed server-side only — clients must never overwrite it
+    _BLOCKED_PREF_KEYS = {'idb_key'}
+    updates = {k: v for k, v in updates.items() if k not in _BLOCKED_PREF_KEYS}
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
