@@ -147,7 +147,7 @@ def verify_hmac_for_authenticated_requests():
     from flask_jwt_extended import decode_token
 
     # Skip admin routes — handled by require_admin_auth
-    if req.path.startswith('/admin/'):
+    if req.path.startswith('/admin/') or req.path.startswith('/auth/'):
         return
 
     token = req.cookies.get('access_token_cookie')
