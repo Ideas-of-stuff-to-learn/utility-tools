@@ -70,7 +70,7 @@ async function idbWriteUploadStats(stats) {
 // ── Context ────────────────────────────────────────────────────────────────
 
 export function TransactionsProvider({ children }) {
-    const { isLoggedIn } = useAuth();
+    const { isLoggedIn, idbReady } = useAuth();
     const { startManualReviewFlowIfNeeded } = useProcessing();
     const { mrPicks, setMrPicks } = useUserPreferences();
 
@@ -136,11 +136,16 @@ export function TransactionsProvider({ children }) {
         async function loadInitialData() {
             try {
                 // ── Step 1: IDB instant hydration ──────────────────────────
-                const [cachedTxns, cachedCats, cachedUpload] = await Promise.all([
-                    idbReadAllTransactions(),
-                    idbReadCategories(),
-                    idbReadUploadStats(),
-                ]);
+                // idbReady is true once getMe() resolved and the crypto key was
+                // set. If it's false here (first-time user, or key not yet set),
+                // skip IDB reads entirely and go straight to the server fetch.
+                const [cachedTxns, cachedCats, cachedUpload] = idbReady
+                    ? await Promise.all([
+                        idbReadAllTransactions(),
+                        idbReadCategories(),
+                        idbReadUploadStats(),
+                    ])
+                    : [[], null, null];
 
                 if (!cancelled && cachedTxns.length > 0) setTransactions(cachedTxns);
                 if (!cancelled && cachedCats?.length > 0) setCategories(cachedCats);
@@ -259,7 +264,7 @@ export function TransactionsProvider({ children }) {
             cancelled = true;
             controller.abort();
         };
-    }, [isLoggedIn, loadRetryCount]);
+    }, [isLoggedIn, idbReady, loadRetryCount]);
 
     // ── Optimistic transaction update helper ───────────────────────────────
     // Mutations (categorize, delete) use this to update IDB + React state

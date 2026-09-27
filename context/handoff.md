@@ -1,3 +1,57 @@
+## Pre-Compact Snapshot — 2026-09-27 21:29
+
+**Git HEAD:** `51f17ef`
+**Files touched:** context/handoff.md, context/session-snapshot.md
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
+## Pre-Compact Snapshot — 2026-09-27 19:21
+
+**Git HEAD:** `5d77a78`
+**Files touched:** context/handoff.md, context/session-snapshot.md
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
+## Pre-Compact Snapshot — 2026-09-27 17:32
+
+**Git HEAD:** `78b81ef`
+**Files touched:** context/session-snapshot.md, context/handoff.md
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
+## 2026-09-27 — Task 25: Encrypted IndexedDB layer (SHIPPED 78b81ef)
+
+**What shipped:**
+- Envelope encryption: `IDB_MASTER_KEY` KEK in `.env` + Render env; per-user AES-256-GCM DEK in `user_idb_keys` table
+- `crypto/idb_keys.py` — `get_or_create_dek()`, encrypt/decrypt DEK with KEK
+- `migrations/add_user_idb_keys.sql` — **already run on Supabase**
+- `/auth/login`, `/auth/signup`, `/auth/me` return `idb_key` + `user_id`
+- `GET /categories` returns `version` field for staleness detection
+- `PUT /preferences` blocks `idb_key` from client overwrites
+- `src/idb/crypto.js` — AES-256-GCM Web Crypto
+- `src/idb/store.js` — per-user `cashflow-db-{userId}` with 6 stores + staleness API
+- `src/idb/writeQueue.js` — optimistic queue, drain on focus/online, rollback on permanent failure
+- `api.jsx` — DEK imported as CryptoKey on login/signup/getMe; key nulled on logout (IDB blobs persist)
+- `UserPreferencesContext.jsx` — IDB instant hydration + server authoritative; localStorage fully removed
+- `TransactionsContext.jsx` — IDB cache hydration + staleness + `optimisticUpdateTransactions`
+
+**What was deliberately left on localStorage:** `theme` and `appliedChartTheme` (non-sensitive, synchronous boot requirement)
+
+**Admin IDB (`cashflow-admin-db-{userId}`) not yet wired** — separate future task.
+
+**Next:** Task 10 (React Native) or Tasks 3+4 (Stripe billing — P1 Critical).
+
+---
+
 ## 2026-09-27 — HMAC login bug fix (SHIPPED e5d4d9b)
 
 **Bug:** Login broken on prod — "HMAC verification failed: Missing HMAC headers"

@@ -12,7 +12,7 @@ import {
     computeIncomePoints,
 } from '../../utils/charts/stackChartGeometry';
 import '../../styles/stackedChartStyles.css';
-import { useRef, useEffect } from 'react';
+import { useRef, useLayoutEffect } from 'react';
 
 const BAR_WIDTH = 32;
 const BAR_SPACING = 20;
@@ -47,7 +47,7 @@ function SpendingStackChart({
     // the most recent bars are what's initially visible - scrolling
     // LEFT reveals older ones within this same 12-item window. Runs
     // after every stackData change, not just on first mount.
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (hscrollRef.current) {
             // rightmost
             hscrollRef.current.scrollLeft = hscrollRef.current.scrollWidth;

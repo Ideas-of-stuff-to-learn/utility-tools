@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useTransactions, useProcessing, useChartFilter } from '../appState';
 import { useInitialLoadLogic } from '../customHooks/homescreen/useInitialLoadLogic';
 import { useLogout } from '../customHooks/homescreen/useLogout';
@@ -36,18 +36,30 @@ export default function DashboardScreen() {
 
     const {
         hasData, effectiveOrder, updateOrder, resetOrder, persist, togglePersist, isCustomOrder,
-        availableCategories, setSelectedCategories: setChartSelectedCategories,
+        availableCategories, selectedCategories, setSelectedCategories: setChartSelectedCategories,
         monthBounds, yearBounds,
         monthWindow, yearWindowEntries,
+        monthWindowStart, yearWindowStart,
         scrollMonthWindow, scrollYearWindow, jumpMonthWindowToYear,
         canScrollMonthBack, canScrollMonthForward,
         canScrollYearBack, canScrollYearForward,
         setMonthWindowByIndex, setYearWindowByIndex,
+        setMonthWindow, setYearWindowStart,
         monthSliderMaxIndex, monthSliderCurrentIndex,
         yearSliderMaxIndex, yearSliderCurrentIndex,
         monthSliderTrackMax, yearSliderTrackMax,
         buildStackDataFromEntries, incomeForEntries, selectedSegment,
     } = useChartData();
+
+    const handleRestoreWindow = useCallback(({ mode: savedMode, monthWindowStart: mws, yearWindowStart: yws }) => {
+        if (mws) setMonthWindow(mws);
+        if (yws != null) setYearWindowStart(yws);
+        // mode is managed by ChartWindowSection state internally — can't restore from here
+    }, [setMonthWindow, setYearWindowStart]);
+
+    const handleRestoreCategories = useCallback((cats) => {
+        setChartSelectedCategories(cats);
+    }, [setChartSelectedCategories]);
     const chartReady = useDetailedChartReveal(hasData);
     const chartAreaRef = useRef(null);
 
@@ -93,6 +105,8 @@ export default function DashboardScreen() {
                             hasData={hasData}
                             monthWindow={monthWindow}
                             yearWindowEntries={yearWindowEntries}
+                            monthWindowStart={monthWindowStart}
+                            yearWindowStart={yearWindowStart}
                             scrollMonthWindow={scrollMonthWindow}
                             scrollYearWindow={scrollYearWindow}
                             jumpMonthWindowToYear={jumpMonthWindowToYear}
@@ -112,6 +126,9 @@ export default function DashboardScreen() {
                             incomeForEntries={incomeForEntries}
                             monthBounds={monthBounds}
                             yearBounds={yearBounds}
+                            selectedCategories={selectedCategories}
+                            onRestoreWindow={handleRestoreWindow}
+                            onRestoreCategories={handleRestoreCategories}
                         />
                     </div>
                 </div>

@@ -136,10 +136,12 @@ export function useChartWindows(monthly, yearly) {
 
     return {
         monthWindow, yearWindowEntries,
+        monthWindowStart, yearWindowStart,
         scrollMonthWindow, scrollYearWindow, jumpMonthWindowToYear,
         canScrollMonthBack, canScrollMonthForward,
         canScrollYearBack, canScrollYearForward,
         setMonthWindowByIndex, setYearWindowByIndex,
+        setMonthWindow, setYearWindowStart,
         monthSliderMaxIndex, monthSliderCurrentIndex,
         yearSliderMaxIndex, yearSliderCurrentIndex,
         monthSliderTrackMax, yearSliderTrackMax,

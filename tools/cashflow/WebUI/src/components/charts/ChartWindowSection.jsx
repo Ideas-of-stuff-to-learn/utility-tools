@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import '../../styles/chartStyles.css';
-import SpendingStackChart from './SpendingStackedChart';
+import SpendingStackChart from './StackChartCanvas';
 import LoadingBarsPlaceholder from '../loading/LoadingBarsPlaceholder';
 import ChartWindowToggle from './chartWindowsToggle';
 import SegmentPopupFixed from './SegmentPopupFixed';
@@ -14,6 +14,7 @@ import { POPUP_VARIANT, POPUP_STATES } from '../../config/popupChartConfig';
 export default function ChartWindowSection({
     ready, hasData,
     monthWindow, yearWindowEntries,
+    monthWindowStart, yearWindowStart,
     scrollMonthWindow, scrollYearWindow, jumpMonthWindowToYear,
     canScrollMonthBack, canScrollMonthForward,
     canScrollYearBack, canScrollYearForward,
@@ -23,6 +24,9 @@ export default function ChartWindowSection({
     monthBounds, yearBounds,
     buildStackDataFromEntries,
     incomeForEntries,
+    // IDB restore callbacks — optional, provided by parent screens
+    onRestoreWindow, onRestoreCategories,
+    selectedCategories,
 }) {
     const [heightScale, setHeightScale] = useState(1);
     const [mode, setMode] = useState('month');
@@ -47,8 +51,14 @@ export default function ChartWindowSection({
     }
 
     const activeEntries = mode === 'year' ? yearWindowEntries : monthWindow;
-    const stackData = buildStackDataFromEntries(activeEntries, mode === 'year' ? jumpMonthWindowToYear : null);
-    const incomeData = incomeForEntries(activeEntries);
+    const stackData = useMemo(
+        () => buildStackDataFromEntries(activeEntries, mode === 'year' ? jumpMonthWindowToYear : null),
+        [activeEntries, mode, jumpMonthWindowToYear, buildStackDataFromEntries]
+    );
+    const incomeData = useMemo(
+        () => incomeForEntries(activeEntries),
+        [activeEntries, incomeForEntries]
+    );
 
     const canGoBack = mode === 'year' ? canScrollYearBack : canScrollMonthBack;
     const canGoForward = mode === 'year' ? canScrollYearForward : canScrollMonthForward;
@@ -92,6 +102,12 @@ export default function ChartWindowSection({
                     onSegmentInteract={handleSegmentInteract}
                     onChartMouseLeave={handleChartMouseLeave}
                     onChartBackgroundClick={handleChartBackgroundClick}
+                    mode={mode}
+                    monthWindowStart={monthWindowStart}
+                    yearWindowStart={yearWindowStart}
+                    selectedCategories={selectedCategories}
+                    onRestoreWindow={onRestoreWindow}
+                    onRestoreCategories={onRestoreCategories}
                 />
             </div>
 

@@ -44,7 +44,7 @@ function computeChartSummary(transactions) {
 }
 
 export function ChartFilterProvider({ children }) {
-    const { isLoggedIn } = useAuth();
+    const { isLoggedIn, idbReady } = useAuth();
     const { categoryNames, transactions } = useTransactions();
 
     const [chartSummary, setChartSummary] = useState({ yearly: [], monthly: [] });
@@ -64,9 +64,11 @@ export function ChartFilterProvider({ children }) {
     // ── Phase 1: instant IDB warm-start ────────────────────────────────────
     // Reads ONE pre-computed chart_summary blob (single decrypt, ~2ms) so
     // hasData=true before transactions finish loading from IDB.
-    // This fires as soon as isLoggedIn flips — transactions haven't loaded yet.
+    // Gated on idbReady (not isLoggedIn) — isLoggedIn can be true from
+    // the sessionStorage hint before getMe() resolves and sets the crypto
+    // key, which would cause getIdbKey() to return null and bail silently.
     useEffect(() => {
-        if (!isLoggedIn) return;
+        if (!idbReady) return;
         const cryptoKey = getIdbKey();
         const userId    = getIdbUserId();
         if (!cryptoKey || !userId) return;
@@ -76,7 +78,7 @@ export function ChartFilterProvider({ children }) {
                 if (cached?.yearly?.length > 0) setChartSummary(cached);
             })
             .catch(() => {});
-    }, [isLoggedIn]);
+    }, [idbReady]);
 
     // ── Phase 2: recompute from full transactions ───────────────────────────
     // Runs once transactions are in state (from IDB or server). Computes fresh
@@ -98,7 +100,9 @@ export function ChartFilterProvider({ children }) {
 
     // ── Reset on logout ─────────────────────────────────────────────────────
     useEffect(() => {
-        if (!isLoggedIn) setChartSummary({ yearly: [], monthly: [] });
+        if (!isLoggedIn) {
+            setChartSummary({ yearly: [], monthly: [] });
+        }
     }, [isLoggedIn]);
 
     const toggleContentsCategory = useCallback((cat) => {

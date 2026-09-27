@@ -39,6 +39,15 @@ export function computeBarTotalLabelPosition(bar, { maxValue, chartHeight, heigh
     return labelHeadroom + topPadding + chartHeight - visibleSum;
 }
 
+// Array-returning version of computeIncomePoints for canvas rendering.
+// Returns [{x, y}] instead of an SVG points string.
+export function computeIncomePointsArray({ incomeData, leftPadding, columnWidth, barWidth, maxValue, labelHeadroom, topPadding, chartHeight }) {
+    return (incomeData || []).map((d, i) => ({
+        x: leftPadding + i * columnWidth + barWidth / 2,
+        y: labelHeadroom + topPadding + chartHeight - ((d.value || 0) / maxValue) * chartHeight,
+    }));
+}
+
 // The anchor point a popup should appear at for a given segment click -
 // horizontally centered on the bar, vertically at the segment's own
 // top edge. Used by both the fixed-position and floating popup
