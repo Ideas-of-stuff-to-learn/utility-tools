@@ -8,6 +8,23 @@ let csrfAdminAccess    = null;
 let csrfAdminRefresh   = null;
 let hmacSigningSecret  = null;  // hex string, held in JS memory only
 
+// ── IDB key — held in JS memory only, never persisted ───────────────────────
+let _idbCryptoKey = null;
+let _idbAdminUserId = null;
+
+export function getIdbKey()        { return _idbCryptoKey; }
+export function getIdbAdminUserId() { return _idbAdminUserId; }
+
+async function _setIdbKey(base64Dek, adminUserId) {
+    try {
+        const { importKey } = await import('./idb/crypto.js');
+        _idbCryptoKey    = await importKey(base64Dek);
+        _idbAdminUserId  = adminUserId;
+    } catch (e) {
+        console.warn('[AdminIDB] key import failed:', e.message);
+    }
+}
+
 async function computeHmacHeaders(method, path) {
     if (!hmacSigningSecret) return {};
     const ts = Math.floor(Date.now() / 1000);
@@ -122,6 +139,7 @@ export async function loginStep2(tempToken, totpCode) {
     csrfAdminAccess  = d.csrf_admin_access;
     csrfAdminRefresh = d.csrf_admin_refresh;
     if (d.hmac_signing_secret) hmacSigningSecret = d.hmac_signing_secret;
+    if (d.idb_key && d.admin_user_id != null) await _setIdbKey(d.idb_key, d.admin_user_id);
     return d;
 }
 
@@ -134,6 +152,9 @@ export async function logout() {
     csrfAdminAccess   = null;
     csrfAdminRefresh  = null;
     hmacSigningSecret = null;
+    // Null the IDB key so encrypted blobs are unreadable until next login
+    _idbCryptoKey    = null;
+    _idbAdminUserId  = null;
 }
 
 export async function getMe() {
@@ -141,6 +162,7 @@ export async function getMe() {
     const d = await parseJson(r, 'Failed to fetch account info');
     if (d.csrf_admin_access)  csrfAdminAccess  = d.csrf_admin_access;
     if (d.csrf_admin_refresh) csrfAdminRefresh = d.csrf_admin_refresh;
+    if (d.idb_key && d.id != null) await _setIdbKey(d.idb_key, d.id);
     return d;
 }
 

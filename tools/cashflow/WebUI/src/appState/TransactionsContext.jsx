@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { getCategories, getUploadCount, getUploadBreakdown, getTransactionHistory, resolveCategories } from '../api';
 import { getIdbKey, getIdbUserId } from '../api';
 import { useAuth } from './AuthContext';
@@ -73,6 +73,10 @@ export function TransactionsProvider({ children }) {
     const { isLoggedIn } = useAuth();
     const { startManualReviewFlowIfNeeded } = useProcessing();
     const { mrPicks, setMrPicks } = useUserPreferences();
+
+    // Stable ref so the load effect doesn't re-run when ProcessingContext re-renders mid-load
+    const startMRRef = useRef(startManualReviewFlowIfNeeded);
+    useEffect(() => { startMRRef.current = startManualReviewFlowIfNeeded; }, [startManualReviewFlowIfNeeded]);
 
     const [transactions, setTransactions] = useState([]);
     const [categories, setCategories] = useState([]);
@@ -231,7 +235,7 @@ export function TransactionsProvider({ children }) {
                                 return resolvedMap.has(key) ? { ...t, category: resolvedMap.get(key) } : t;
                             })
                             : current;
-                        startManualReviewFlowIfNeeded(corrected);
+                        startMRRef.current(corrected);
                         return corrected;
                     });
                 }
@@ -254,7 +258,7 @@ export function TransactionsProvider({ children }) {
             cancelled = true;
             controller.abort();
         };
-    }, [isLoggedIn, loadRetryCount, startManualReviewFlowIfNeeded]);
+    }, [isLoggedIn, loadRetryCount]);
 
     // ── Optimistic transaction update helper ───────────────────────────────
     // Mutations (categorize, delete) use this to update IDB + React state

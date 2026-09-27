@@ -37,6 +37,7 @@ from middleware.admin_rate_limits import (
 from database import get_connection, release_connection
 from middleware.admin_middleware import get_admin_role_and_permissions, require_admin_auth
 from hmac_auth import derive_signing_secret
+from crypto.idb_keys import get_or_create_admin_dek
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -305,6 +306,8 @@ def admin_verify_totp():
             'permissions': sorted(perms),
             'username': username_row[0] if username_row else '',
             'display_name': username_row[0] if username_row else '',
+            'admin_user_id': admin_id,
+            'idb_key': get_or_create_admin_dek(conn, admin_id),
         })
         _set_admin_cookies(resp, access_token, refresh_token)
         return resp, 200
@@ -420,6 +423,7 @@ def admin_me():
             'permissions':        sorted(perms),
             'csrf_admin_access':  csrf_access,
             'csrf_admin_refresh': csrf_refresh,
+            'idb_key':            get_or_create_admin_dek(conn, admin_id),
         }), 200
     except Exception as e:
         app.logger.error(f'admin_me failed: {e}')
