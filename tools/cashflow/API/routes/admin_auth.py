@@ -32,6 +32,7 @@ from extensions import app, limiter
 from middleware.admin_rate_limits import (
     RL_ADMIN_LOGIN, RL_ADMIN_ME, RL_ADMIN_REFRESH,
     RL_READ_ADMIN, RL_ADMIN_WRITE, RL_ADMIN_SENSITIVE,
+    RL_GEO_HEARTBEAT,
 )
 from database import get_connection, release_connection
 from middleware.admin_middleware import get_admin_role_and_permissions, require_admin_auth
@@ -277,7 +278,16 @@ def admin_verify_totp():
 
         _reset_failed(conn, admin_id)
         _write_login_log(conn, admin_id, 'success')
+
+        # Geo-block check — runs BEFORE session is issued so we never
+        # hand out tokens we'd immediately revoke.
+        from geo import check_geo_at_login
+        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+        geo_allowed, geo_blocked, geo_message, _geo_outcome = check_geo_at_login(admin_id, client_ip, conn)
         conn.commit()
+
+        if not geo_allowed:
+            return jsonify({'error': geo_message, 'geo_blocked': True}), 403
 
         access_token, refresh_token = _issue_admin_session(admin_id)
         access_jti = decode_token(access_token)['jti']
@@ -649,6 +659,39 @@ def admin_reset_mfa(target_id):
         return jsonify({'error': 'MFA reset failed'}), 500
     finally:
         release_connection(conn)
+
+
+# ── Geo heartbeat ─────────────────────────────────────────────────────────────
+
+@app.route('/admin/geo/heartbeat', methods=['POST'])
+@require_admin_auth()
+@limiter.limit(RL_GEO_HEARTBEAT)
+def admin_geo_heartbeat():
+    """Periodic geo check called by the admin panel every 10 minutes.
+
+    If impossible travel is detected the session is revoked server-side and
+    a 403 is returned. The frontend shows the in-app alert and logs out.
+    """
+    admin_id = g.admin_user_id
+    jti      = g.admin_token_jti
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+
+    from geo import check_geo_heartbeat
+    conn = get_connection()
+    try:
+        allowed, message, outcome = check_geo_heartbeat(admin_id, client_ip, jti, conn, trigger='heartbeat')
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        app.logger.error('geo_heartbeat failed: %s', e)
+        return jsonify({'status': 'ok', 'outcome': 'error'}), 200  # fail-open
+    finally:
+        release_connection(conn)
+
+    if not allowed:
+        return jsonify({'geo_blocked': True, 'message': message}), 403
+
+    return jsonify({'status': 'ok', 'outcome': outcome}), 200
 
 
 # ── Flask CLI bootstrap ───────────────────────────────────────────────────────

@@ -328,3 +328,26 @@ export async function getAuditLog({ action = '', actor = '', limit = 200 } = {})
     const r = await authFetch(`${BASE_URL}/admin/audit?${params}`);
     return (await parseJson(r, 'Failed to fetch audit log')).log;
 }
+
+// ── Admin — geo logs ──────────────────────────────────────────────────────────
+
+export async function getGeoLogs({ userId = '', from = '', to = '', limit = 1000 } = {}) {
+    const params = new URLSearchParams();
+    if (userId) params.set('user_id', userId);
+    if (from)   params.set('from', from);
+    if (to)     params.set('to', to);
+    params.set('limit', limit);
+    const r = await authFetch(`${BASE_URL}/admin/geo-logs?${params}`);
+    return await parseJson(r, 'Failed to fetch geo logs');
+}
+
+// Returns {geo_blocked, message} on suspicious activity, or null if ok.
+export async function postGeoHeartbeat() {
+    const r = await authFetch(`${BASE_URL}/admin/geo/heartbeat`, { method: 'POST' });
+    if (r.status === 403) {
+        const d = await r.json().catch(() => ({}));
+        return { geo_blocked: true, message: d.message || d.error || 'Suspicious activity detected.' };
+    }
+    await r.json().catch(() => {});
+    return null;
+}

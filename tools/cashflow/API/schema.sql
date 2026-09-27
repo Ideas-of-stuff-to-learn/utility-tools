@@ -451,3 +451,30 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
 CREATE INDEX IF NOT EXISTS idx_admin_audit_log_created_at  ON admin_audit_log (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_log_actor       ON admin_audit_log (actor_admin_id);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_log_action      ON admin_audit_log (action);
+
+-- =====================================================================
+-- Geo-blocking + impossible travel detection (2026-09-27)
+-- Tracks the last known country/continent per admin account so
+-- impossible-travel checks can compare against the prior location.
+-- suspicious_strike_count / last_suspicious_at drive exponential lockout.
+-- =====================================================================
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS last_geo_country       VARCHAR(2);
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS last_geo_continent     VARCHAR(2);
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS last_geo_checked_at    TIMESTAMPTZ;
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS suspicious_strike_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS last_suspicious_at     TIMESTAMPTZ;
+
+-- One row per ip-api.com call: visibility into usage, outcomes, and
+-- impossible-travel events. Cheap to write, queryable in admin panel.
+CREATE TABLE IF NOT EXISTS geo_lookup_log (
+    id              SERIAL PRIMARY KEY,
+    admin_user_id   INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
+    ip_address      TEXT,
+    trigger         TEXT,        -- 'login' | 'heartbeat' | 'token_refresh' | 'page_focus'
+    country_code    VARCHAR(2),
+    continent_code  VARCHAR(2),
+    outcome         TEXT,        -- 'allowed' | 'blocked_allowlist' | 'blocked_travel' | 'country_changed' | 'api_error'
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_geo_lookup_log_created_at     ON geo_lookup_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_geo_lookup_log_admin_user_id  ON geo_lookup_log (admin_user_id);

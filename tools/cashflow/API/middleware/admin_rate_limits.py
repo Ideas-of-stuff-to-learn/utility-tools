@@ -25,6 +25,7 @@ DISABLE_RL_ADMIN_WRITE               = False  # POST/PATCH/DELETE admin panel wr
 DISABLE_RL_ADMIN_SENSITIVE           = False  # POST /admin/tokens/revoke + /reset-mfa
 DISABLE_RL_ADMIN_UNLOCK              = False  # POST /admin/users/<id>/unlock
 DISABLE_RL_ADMIN_USER_TRANSACTIONS   = False  # GET  /admin/users/<id>/transactions
+DISABLE_RL_GEO_HEARTBEAT             = False  # POST /admin/geo/heartbeat
 
 
 # ── INTERNAL HELPER ──────────────────────────────────────────────────────────
@@ -91,3 +92,9 @@ RL_ADMIN_UNLOCK = _rl("30 per hour", "DISABLE_RL_ADMIN_UNLOCK")
 RL_ADMIN_USER_TRANSACTIONS = _rl("200 per day", "DISABLE_RL_ADMIN_USER_TRANSACTIONS")
 # GET /admin/users/<id>/transactions — admin view of a user's transactions.
 # Used in: routes/admin.py
+
+RL_GEO_HEARTBEAT = _rl("20 per hour", "DISABLE_RL_GEO_HEARTBEAT")
+# POST /admin/geo/heartbeat — periodic geo check from the admin panel frontend.
+# 20/hr is far above the intended 6/hr (one per 10 min) but allows catch-up
+# after the tab was backgrounded without eating into the ip-api.com 45/min budget.
+# Used in: routes/admin_auth.py

@@ -5,12 +5,14 @@ const LANDING_URL = import.meta.env.PROD
     : 'http://localhost:5174/';
 
 const AUDIT_MIN = parseInt(import.meta.env.VITE_ADMIN_AUDIT_MIN_LEVEL ?? '60', 10);
+const GEO_LOG_MIN = 1; // any admin (level ≥ 1) can see geo logs
 
 export default function Sidebar({ user, onLogout }) {
     const displayName = user?.display_name || user?.username || '—';
     const role = user?.role || '';
     const level = user?.level ?? 0;
-    const canSeeAudit = user?.role === 'owner' || level >= AUDIT_MIN;
+    const canSeeAudit  = user?.role === 'owner' || level >= AUDIT_MIN;
+    const canSeeGeoLog = user?.role === 'owner' || level >= GEO_LOG_MIN;
     const perms = user?.permissions || [];
     const canManageAccounts = user?.role === 'owner' || perms.includes('admin.accounts.manage');
 
@@ -28,8 +30,9 @@ export default function Sidebar({ user, onLogout }) {
             <NavLink className="admin-nav-item" to="/general/roles">Roles &amp; Permissions</NavLink>
             {canManageAccounts && <NavLink className="admin-nav-item" to="/general/admin-accounts">Admin Accounts</NavLink>}
             <NavLink className="admin-nav-item" to="/general/unlock">Unlock Account</NavLink>
-            {canSeeAudit && <NavLink className="admin-nav-item" to="/general/impersonation-log">Impersonation Log</NavLink>}
-            {canSeeAudit && <NavLink className="admin-nav-item" to="/general/audit-log">Audit Log</NavLink>}
+            {canSeeAudit  && <NavLink className="admin-nav-item" to="/general/impersonation-log">Impersonation Log</NavLink>}
+            {canSeeAudit  && <NavLink className="admin-nav-item" to="/general/audit-log">Audit Log</NavLink>}
+            {canSeeGeoLog && <NavLink className="admin-nav-item" to="/general/geo-logs">Geo Logs</NavLink>}
 
             <div className="admin-sidebar-section">Cashflow</div>
             <NavLink className="admin-nav-item" to="/cashflow/categories">Categories</NavLink>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { getMe, logout } from './api.js';
+import { getMe, logout, postGeoHeartbeat } from './api.js';
 import Sidebar from './components/Sidebar.jsx';
 import StartupScreen from './components/StartupScreen.jsx';
 import LoginScreen from './screens/Auth/LoginScreen.jsx';
@@ -12,15 +12,54 @@ import AdminAccountsScreen from './screens/General/AdminAccountsScreen.jsx';
 import UnlockScreen from './screens/General/UnlockScreen.jsx';
 import ImpersonationLogScreen from './screens/General/ImpersonationLogScreen.jsx';
 import AuditLogScreen from './screens/General/AuditLogScreen.jsx';
+import GeoLogsScreen from './screens/General/GeoLogsScreen.jsx';
 import CategoriesScreen from './screens/Cashflow/CategoriesScreen.jsx';
 import UserTransactionsScreen from './screens/Cashflow/UserTransactionsScreen.jsx';
 
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const IDLE_TIMEOUT_MS   = 30 * 60 * 1000; // 30 minutes
+const GEO_HEARTBEAT_MS  = 10 * 60 * 1000; // 10 minutes
 
 // auth states: 'loading' | 'login' | 'signup' | 'forgot' | 'denied' | 'ok'
 
-function AdminApp({ user, onLogout }) {
+function AdminApp({ user, onLogout, onGeoBlock }) {
     const caller = { id: user?.id, role: user?.role, level: user?.level ?? 0 };
+
+    // Geo heartbeat every 10 minutes
+    useEffect(() => {
+        let lastHeartbeatAt = 0;
+
+        async function runHeartbeat() {
+            // Deduplicate: if a token refresh just ran recently (within 30s) skip
+            const now = Date.now();
+            if (now - lastHeartbeatAt < 30_000) return;
+            lastHeartbeatAt = now;
+            try {
+                const result = await postGeoHeartbeat();
+                if (result?.geo_blocked) {
+                    onGeoBlock(result.message);
+                }
+            } catch {
+                // network error — ignore, will retry next interval
+            }
+        }
+
+        // Run once after 30s then every 10 min
+        const initial = setTimeout(runHeartbeat, 30_000);
+        const interval = setInterval(runHeartbeat, GEO_HEARTBEAT_MS);
+
+        // Page-focus handler — run on tab becoming visible after being hidden
+        function onVisibilityChange() {
+            if (!document.hidden) runHeartbeat();
+        }
+        document.addEventListener('visibilitychange', onVisibilityChange);
+
+        return () => {
+            clearTimeout(initial);
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
+    }, [onGeoBlock]);
+
     return (
         <div className="admin-layout">
             <Sidebar user={user} onLogout={onLogout} />
@@ -33,6 +72,7 @@ function AdminApp({ user, onLogout }) {
                     <Route path="/general/unlock" element={<UnlockScreen />} />
                     <Route path="/general/impersonation-log" element={<ImpersonationLogScreen />} />
                     <Route path="/general/audit-log" element={<AuditLogScreen />} />
+                    <Route path="/general/geo-logs" element={<GeoLogsScreen caller={caller} />} />
                     <Route path="/cashflow/categories" element={<CategoriesScreen />} />
                     <Route path="/cashflow/user-transactions" element={<UserTransactionsScreen caller={caller} />} />
                     <Route path="*" element={<Navigate to="/general/users" replace />} />
@@ -49,6 +89,7 @@ function hasAdminAccess(data) {
 export default function App() {
     const [authState, setAuthState] = useState('loading');
     const [user, setUser] = useState(null);
+    const [geoBlockMessage, setGeoBlockMessage] = useState('');
     const idleTimerRef = useRef(null);
 
     function resetIdleTimer() {
@@ -97,13 +138,21 @@ export default function App() {
         setAuthState('login');
     }
 
+    async function handleGeoBlock(message) {
+        setGeoBlockMessage(message || 'Suspicious activity detected — you have been logged out.');
+        await logout();
+        setUser(null);
+        setAuthState('login');
+    }
+
     if (authState === 'loading') return <StartupScreen />;
 
     if (authState === 'login') {
         return (
             <LoginScreen
-                onLogin={handleLoginSuccess}
+                onLogin={(data) => { setGeoBlockMessage(''); handleLoginSuccess(data); }}
                 onGoSignup={() => setAuthState('signup')}
+                geoBlockMessage={geoBlockMessage}
             />
         );
     }
@@ -129,7 +178,7 @@ export default function App() {
 
     return (
         <HashRouter>
-            <AdminApp user={user} onLogout={handleLogout} />
+            <AdminApp user={user} onLogout={handleLogout} onGeoBlock={handleGeoBlock} />
         </HashRouter>
     );
 }

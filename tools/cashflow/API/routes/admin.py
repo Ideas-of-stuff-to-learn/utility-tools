@@ -18,6 +18,7 @@ import bcrypt
 from extensions import app, limiter, IMPERSONATION_TOKEN_EXPIRES
 from middleware.admin_rate_limits import (
     RL_READ_ADMIN, RL_ADMIN_WRITE, RL_ADMIN_SENSITIVE, RL_ADMIN_UNLOCK, RL_ADMIN_USER_TRANSACTIONS,
+    RL_GEO_HEARTBEAT,
 )
 from database import get_connection, release_connection
 from middleware.admin_middleware import require_admin_auth, get_admin_role_and_permissions
@@ -1013,3 +1014,124 @@ def admin_audit_log():
         release_connection(conn)
 
 
+
+
+# ── Geo lookup log ─────────────────────────────────────────────────────────────
+
+@app.route('/admin/geo-logs', methods=['GET'])
+@require_admin_auth()
+@limiter.limit(RL_READ_ADMIN)
+def admin_geo_logs():
+    """Return geo lookup log rows the caller is permitted to see.
+
+    Level gating (same pattern as admin_list_accounts):
+      - Owner sees all rows.
+      - Other callers see their own rows + rows for users at strictly lower level.
+
+    Query params:
+      user_id  int          filter by admin_user_id
+      from     ISO 8601     start of date range (default: 90 days ago)
+      to       ISO 8601     end of date range (default: now)
+      limit    int          max rows returned (default 1000, max 2000)
+    """
+    from datetime import datetime, timezone, timedelta
+    caller_id = g.admin_user_id
+    conn = get_connection()
+    try:
+        caller_role, caller_level, _ = get_admin_role_and_permissions(conn, caller_id)
+
+        # Parse query params
+        try:
+            limit = min(int(request.args.get('limit', 1000)), 2000)
+        except (TypeError, ValueError):
+            limit = 1000
+
+        from_raw = request.args.get('from')
+        to_raw   = request.args.get('to')
+        user_id_raw = request.args.get('user_id')
+
+        default_from = datetime.now(timezone.utc) - timedelta(days=90)
+        try:
+            from_dt = datetime.fromisoformat(from_raw.replace('Z', '+00:00')) if from_raw else default_from
+        except (ValueError, AttributeError):
+            from_dt = default_from
+        try:
+            to_dt = datetime.fromisoformat(to_raw.replace('Z', '+00:00')) if to_raw else datetime.now(timezone.utc)
+        except (ValueError, AttributeError):
+            to_dt = datetime.now(timezone.utc)
+
+        # Build visible user_id list
+        # Owner can see all; others see themselves + lower-level users
+        where_clauses = ['g.created_at BETWEEN %s AND %s']
+        params = [from_dt, to_dt]
+
+        if user_id_raw:
+            # Filter to specific user — still apply level gate
+            try:
+                target_uid = int(user_id_raw)
+            except (TypeError, ValueError):
+                return jsonify({'error': 'Invalid user_id'}), 400
+
+            if caller_role != 'owner' and target_uid != caller_id:
+                # Check target level
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT r.level FROM admin_users au LEFT JOIN roles r ON au.role_id = r.id WHERE au.id = %s",
+                        (target_uid,),
+                    )
+                    row = cur.fetchone()
+                if not row or (row[0] or 0) >= caller_level:
+                    return jsonify({'error': 'Not authorized to view that account\'s logs'}), 403
+
+            where_clauses.append('g.admin_user_id = %s')
+            params.append(target_uid)
+        elif caller_role != 'owner':
+            # Build a subquery: caller themselves OR lower-level users
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT au.id FROM admin_users au LEFT JOIN roles r ON au.role_id = r.id WHERE r.level < %s OR au.id = %s",
+                    (caller_level, caller_id),
+                )
+                visible_ids = [r[0] for r in cur.fetchall()]
+            if not visible_ids:
+                return jsonify({'logs': [], 'total': 0}), 200
+            where_clauses.append(f'g.admin_user_id = ANY(%s)')
+            params.append(visible_ids)
+
+        where_sql = 'WHERE ' + ' AND '.join(where_clauses)
+        params.append(limit)
+
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""SELECT g.id, g.admin_user_id, au.username,
+                           g.ip_address, g.trigger, g.country_code,
+                           g.continent_code, g.outcome, g.created_at
+                    FROM geo_lookup_log g
+                    LEFT JOIN admin_users au ON g.admin_user_id = au.id
+                    {where_sql}
+                    ORDER BY g.created_at DESC
+                    LIMIT %s""",
+                params,
+            )
+            rows = cur.fetchall()
+
+        logs = [
+            {
+                'id':             row[0],
+                'admin_user_id':  row[1],
+                'username':       row[2] or 'deleted',
+                'ip_address':     row[3] or '',
+                'trigger':        row[4] or '',
+                'country_code':   row[5] or '',
+                'continent_code': row[6] or '',
+                'outcome':        row[7] or '',
+                'created_at':     row[8].isoformat() if row[8] else '',
+            }
+            for row in rows
+        ]
+        return jsonify({'logs': logs, 'total': len(logs)}), 200
+    except Exception as e:
+        app.logger.error(f'admin_geo_logs failed: {e}')
+        return jsonify({'error': 'Failed to fetch geo logs'}), 500
+    finally:
+        release_connection(conn)

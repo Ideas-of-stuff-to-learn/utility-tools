@@ -4,7 +4,7 @@ import StartupScreen from '../../components/StartupScreen.jsx';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 
 // step: 'credentials' | 'totp' | 'enroll'
-export default function LoginScreen({ onLogin }) {
+export default function LoginScreen({ onLogin, geoBlockMessage }) {
     const [step, setStep] = useState('credentials');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -55,6 +55,20 @@ export default function LoginScreen({ onLogin }) {
                 <div className="auth-card">
                     <div className="auth-title">Admin Panel</div>
                     <div className="auth-subtitle">Sign in to your account</div>
+                    {geoBlockMessage && (
+                        <div style={{
+                            background: '#fff0f0',
+                            border: '1px solid #c0392b',
+                            borderRadius: 6,
+                            padding: '10px 14px',
+                            marginBottom: 12,
+                            fontSize: 12,
+                            color: '#c0392b',
+                            whiteSpace: 'pre-line',
+                        }}>
+                            ⚠️ {geoBlockMessage}
+                        </div>
+                    )}
                     {error && <div className="auth-error">{error}</div>}
                     <form onSubmit={handleCredentials}>
                         <div className="form-row">
