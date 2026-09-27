@@ -38,14 +38,14 @@ def _generate_dek() -> bytes:
 def _encrypt_dek(dek: bytes) -> tuple[str, str]:
     """Returns (enc_dek_b64, iv_b64) — both base64-encoded."""
     iv = os.urandom(12)
-    ciphertext = _AESGCM.encrypt(iv, dek, associated_data=None)
+    ciphertext = _AESGCM.encrypt(iv, dek, None)
     return base64.b64encode(ciphertext).decode(), base64.b64encode(iv).decode()
 
 
 def _decrypt_dek(enc_dek_b64: str, iv_b64: str) -> bytes:
     ciphertext = base64.b64decode(enc_dek_b64)
     iv = base64.b64decode(iv_b64)
-    return _AESGCM.decrypt(iv, ciphertext, associated_data=None)
+    return _AESGCM.decrypt(iv, ciphertext, None)
 
 
 def get_or_create_admin_dek(conn, admin_user_id: int) -> str:

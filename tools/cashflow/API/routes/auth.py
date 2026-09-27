@@ -66,6 +66,8 @@ def auth_me():
         email_verified = row[3] if row else False
         pending_email = row[4] if row else None
         role_name, level, perms = get_user_role_and_permissions(conn, current_user)
+        access_cookie  = request.cookies.get('access_token_cookie')
+        refresh_cookie = request.cookies.get('refresh_token_cookie')
         return jsonify({
             'id': current_user,
             'username': username,
@@ -76,8 +78,8 @@ def auth_me():
             'role': role_name,
             'level': level,
             'permissions': sorted(perms),
-            'csrf_access_token': get_csrf_token(request.cookies.get('access_token_cookie')),
-            'csrf_refresh_token': get_csrf_token(request.cookies.get('refresh_token_cookie')),
+            'csrf_access_token':  get_csrf_token(access_cookie)  if access_cookie  else None,
+            'csrf_refresh_token': get_csrf_token(refresh_cookie) if refresh_cookie else None,
             'idb_key': get_or_create_dek(conn, current_user),
         }), 200
     except Exception as e:
