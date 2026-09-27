@@ -48,7 +48,7 @@ export default function DashboardScreen() {
         monthSliderTrackMax, yearSliderTrackMax,
         buildStackDataFromEntries, incomeForEntries, selectedSegment,
     } = useChartData();
-    const chartReady = useDetailedChartReveal();
+    const chartReady = useDetailedChartReveal(hasData);
     const chartAreaRef = useRef(null);
 
     // scrollTop removed — chart area uses overflow:hidden and a windowed

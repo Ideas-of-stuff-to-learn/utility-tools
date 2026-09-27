@@ -29,7 +29,7 @@ export default function ChartsScreen() {
         buildStackDataFromEntries, incomeForEntries,
     } = useChartData();
 
-    const chartReady = useDetailedChartReveal();
+    const chartReady = useDetailedChartReveal(hasData);
 
     // NEW - same one-way mirror pattern Dashboard.jsx already uses for
     // contentsSelectedCategories: whenever the shared mobile filter

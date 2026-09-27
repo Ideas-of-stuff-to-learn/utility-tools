@@ -68,4 +68,5 @@ Use `git revert` when changes have already been pushed to origin.
 2026-09-27 | task: Task 1 tools JWT claim wiring + HMAC login fix | safe-point: 08192e1ec30f03598a1b75962fa5d8320cc03ade | status: complete
 2026-09-27 | task: Task 25 — encrypted IndexedDB layer (envelope encryption + write queue + staleness) | safe-point: 5e3d510421a6395548484d881f56df8d98e1804a | status: complete
 2026-09-27 | task: IDB flicker fix + admin IDB wiring | safe-point: 78b81ef982a48ef66560c05a3e03983af0bbb1fc | status: complete
-2026-09-27 | task: remove setTransactions wipe + admin IDB eager open | safe-point: dfbd82fab6d0fc44b4f2ed4f6458fa409c41ae96 | status: in-progress
+2026-09-27 | task: remove setTransactions wipe + admin IDB eager open | safe-point: dfbd82fab6d0fc44b4f2ed4f6458fa409c41ae96 | status: complete
+2026-09-27 | task: chart rAF gate — tie to hasData to eliminate oscillation | safe-point: 4cb760313736129cdda116c2b065d81a19d691d3 | status: in-progress

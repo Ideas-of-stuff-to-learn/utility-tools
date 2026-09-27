@@ -36,12 +36,12 @@ export default function ChartWindowSection({
         showSegment({ ...segmentData, _positionKey: key, _cursorPos: cursorPos });
     }
 
-    if (!ready) return null;
-
-    if (!hasData) {
+    // ready=false means either hasData=false (loading/empty) or rAF pending (~16ms after data arrives).
+    // Show animated bars with a contextual message rather than a blank area.
+    if (!ready) {
         return (
             <LoadingBarsPlaceholder
-                message={isLoading ? 'Preparing your charts...' : 'No categorised transactions yet — upload a CSV to see charts.'}
+                message={isLoading ? 'Fetching your data...' : 'No categorised transactions yet — upload a CSV to see charts.'}
             />
         );
     }
