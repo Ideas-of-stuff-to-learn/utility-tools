@@ -40,16 +40,7 @@ export default function ChartWindowSection({
         showSegment({ ...segmentData, _positionKey: key, _cursorPos: cursorPos });
     }
 
-    // ready=false means either hasData=false (loading/empty) or rAF pending (~16ms after data arrives).
-    // Show animated bars with a contextual message rather than a blank area.
-    if (!ready) {
-        return (
-            <LoadingBarsPlaceholder
-                message={isLoading ? 'Fetching your data...' : 'No categorised transactions yet — upload a CSV to see charts.'}
-            />
-        );
-    }
-
+    // All hooks must run unconditionally — early return is below them
     const activeEntries = mode === 'year' ? yearWindowEntries : monthWindow;
     const stackData = useMemo(
         () => buildStackDataFromEntries(activeEntries, mode === 'year' ? jumpMonthWindowToYear : null),
@@ -59,6 +50,15 @@ export default function ChartWindowSection({
         () => incomeForEntries(activeEntries),
         [activeEntries, incomeForEntries]
     );
+
+    // Early return AFTER all hooks
+    if (!ready) {
+        return (
+            <LoadingBarsPlaceholder
+                message={isLoading ? 'Fetching your data...' : 'No categorised transactions yet — upload a CSV to see charts.'}
+            />
+        );
+    }
 
     const canGoBack = mode === 'year' ? canScrollYearBack : canScrollMonthBack;
     const canGoForward = mode === 'year' ? canScrollYearForward : canScrollMonthForward;
