@@ -3,6 +3,7 @@
  * Mirrors tools/cashflow/API/permission_weights.py — keep in sync.
  */
 export const PERMISSION_WEIGHTS = {
+    'admin.panel.view':              6,
     'categories.create':             2,
     'categories.rename':             3,
     'categories.recolor':            4,

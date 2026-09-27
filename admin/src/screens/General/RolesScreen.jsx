@@ -65,25 +65,18 @@ function RoleModal({ role, allPermissions, allRoles, caller, onSave, onClose }) 
                     <label className="form-label">Level</label>
                     {canOverride ? (
                         <>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--text)' }}>
-                                    {computedLevel}
-                                </div>
-                                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>formula</div>
-                                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>→ override:</div>
-                                <input
-                                    className="admin-input"
-                                    type="number"
-                                    value={manualLevel}
-                                    placeholder={computedLevel}
-                                    min={1}
-                                    max={caller.level - 1}
-                                    onChange={e => setManualLevel(e.target.value)}
-                                    style={{ maxWidth: 80 }}
-                                />
-                            </div>
+                            <input
+                                className="admin-input"
+                                type="number"
+                                value={manualLevel}
+                                placeholder={computedLevel}
+                                min={1}
+                                max={caller.level - 1}
+                                onChange={e => setManualLevel(e.target.value)}
+                                style={{ maxWidth: 120 }}
+                            />
                             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                                Leave blank to use formula value. Max {caller.level - 1}.
+                                Formula suggests <strong>{computedLevel}</strong> — leave blank to use it (max {caller.level - 1})
                             </div>
                         </>
                     ) : (
