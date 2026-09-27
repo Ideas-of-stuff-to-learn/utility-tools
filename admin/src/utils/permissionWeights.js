@@ -27,5 +27,5 @@ export const PERMISSION_WEIGHTS = {
 export function computeRoleLevel(permissionKeys) {
     if (!permissionKeys || permissionKeys.length === 0) return 0;
     const total = permissionKeys.reduce((sum, k) => sum + (PERMISSION_WEIGHTS[k] ?? 0), 0);
-    return Math.max(1, Math.min(99, total));
+    return Math.max(1, Math.min(100, total));
 }

@@ -31,4 +31,4 @@ def compute_role_level(permission_keys):
     if not permission_keys:
         return 0
     total = sum(PERMISSION_WEIGHTS.get(k, 0) for k in permission_keys)
-    return max(1, min(99, total))
+    return max(1, min(100, total))
