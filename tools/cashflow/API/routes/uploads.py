@@ -13,11 +13,12 @@ before use regardless of where it came from - never trusted blindly
 just because it's a query param.
 """
 from flask import request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
 
 from extensions import app, limiter
 from middleware.user_rate_limits import RL_READ_UPLOADS
 from database import get_connection, release_connection
+from middleware.user_middleware import require_auth
 
 _VALID_UNITS = {'minutes', 'hours', 'days', 'months', 'years'}
 _VALID_MODES = {'logout', 'time_gated'}
@@ -28,7 +29,7 @@ DEFAULT_DURATION_UNIT = 'days'
 
 
 @app.route('/uploads/breakdown', methods=['GET'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_READ_UPLOADS)
 def get_upload_breakdown():
     current_user = int(get_jwt_identity())

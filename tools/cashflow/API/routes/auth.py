@@ -727,8 +727,14 @@ def login():
         # routes (impersonate, delete-user, edit-credentials). A token
         # later obtained via /auth/refresh is deliberately NOT fresh -
         # see refresh() below.
-        access_token = create_access_token(identity=str(user_id), fresh=True)
-        refresh_token = create_refresh_token(identity=str(user_id))
+        access_token = create_access_token(
+            identity=str(user_id), fresh=True,
+            additional_claims={'tools': ['cashflow']},
+        )
+        refresh_token = create_refresh_token(
+            identity=str(user_id),
+            additional_claims={'tools': ['cashflow']},
+        )
         access_jti = decode_token(access_token)['jti']
         resp = jsonify({
             'access_token': access_token,
@@ -806,8 +812,14 @@ def signup():
 
         # fresh=True: they just set this password, this instant - same
         # reasoning as login()'s fresh=True above.
-        access_token = create_access_token(identity=str(new_id), fresh=True)
-        refresh_token = create_refresh_token(identity=str(new_id))
+        access_token = create_access_token(
+            identity=str(new_id), fresh=True,
+            additional_claims={'tools': ['cashflow']},
+        )
+        refresh_token = create_refresh_token(
+            identity=str(new_id),
+            additional_claims={'tools': ['cashflow']},
+        )
         access_jti = decode_token(access_token)['jti']
         resp = jsonify({
             'access_token': access_token,
@@ -846,7 +858,13 @@ def refresh():
     on purpose - see admin_impersonate_user()'s docstring.
     """
     current_user = get_jwt_identity()
-    new_access_token = create_access_token(identity=current_user, fresh=False)
+    # Carry the tools claim forward from the refresh token so the new
+    # access token stays consistent without hardcoding the list here.
+    tools_claim = get_jwt().get('tools', ['cashflow'])
+    new_access_token = create_access_token(
+        identity=current_user, fresh=False,
+        additional_claims={'tools': tools_claim},
+    )
     new_jti = decode_token(new_access_token)['jti']
     resp = jsonify({
         'access_token': new_access_token,

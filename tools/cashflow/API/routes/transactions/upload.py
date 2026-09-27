@@ -16,7 +16,8 @@ import openpyxl
 import xlrd
 
 from flask import request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
+from middleware.user_middleware import require_auth
 from psycopg2.extras import execute_values
 
 from extensions import app, limiter
@@ -53,7 +54,7 @@ def _rows_from_excel(raw_bytes, filename):
 
 
 @app.route('/api/parse-csv', methods=['POST'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_UPLOAD)
 def parse_csv():
     current_user = int(get_jwt_identity())

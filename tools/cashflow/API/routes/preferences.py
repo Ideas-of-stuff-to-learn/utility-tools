@@ -10,15 +10,16 @@ extra join is ever needed. Each key is namespaced: 'columnWidths',
 """
 import json
 from flask import request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
 
 from extensions import app, limiter
 from middleware.user_rate_limits import RL_READ_PREFERENCES, RL_WRITE_PREFERENCES
 from database import get_connection, release_connection
+from middleware.user_middleware import require_auth
 
 
 @app.route('/preferences', methods=['GET'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_READ_PREFERENCES)
 def get_preferences():
     user_id = int(get_jwt_identity())
@@ -40,7 +41,7 @@ def get_preferences():
 
 
 @app.route('/preferences', methods=['PUT'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_WRITE_PREFERENCES)
 def put_preferences():
     user_id = int(get_jwt_identity())

@@ -1,3 +1,64 @@
+## 2026-09-27 — Task 1: tools JWT claim wiring (IN PROGRESS — one blocker)
+
+### What was done
+
+**tools JWT claim added to all issuance points (`routes/auth.py`):**
+- Login (line ~730): `additional_claims={'tools': ['cashflow']}` on both `create_access_token` and `create_refresh_token`
+- Signup (line ~809): same
+- Refresh (line ~849): reads existing `tools` claim from incoming refresh token via `get_jwt().get('tools', ['cashflow'])` and carries it forward — fallback to `['cashflow']` if old token has no claim
+
+**All 22 bare `@jwt_required()` replaced with `@require_auth()` in cashflow route files:**
+- `routes/categories.py` (9 routes) — import updated
+- `routes/charts.py` (1 route) — import added
+- `routes/preferences.py` (2 routes) — import added
+- `routes/uploads.py` (1 route) — import added
+- `routes/transactions/categorisation_routes.py` (8 routes) — import added
+- `routes/transactions/crud.py` (3 routes) — import added
+- `routes/transactions/upload.py` (1 route) — import added
+
+**`require_auth()` in `middleware/user_middleware.py`:**
+- Added `tool='cashflow'` param
+- Currently checks: `if tool not in claims.get('tools', []):` → returns 403
+
+### ONE BLOCKER — needs user decision before ship
+
+**File:** `tools/cashflow/API/middleware/user_middleware.py` ~line 119
+
+**Issue:** Current enforcement is strict — tokens without any `tools` claim (all tokens issued before this deploy) return 403 on every Cashflow route. This breaks all active sessions for up to 30 min post-deploy (until access tokens refresh).
+
+**Ghost-test verdict:** REVISE — change enforcement to fail-open for absent claim.
+
+**The fix (one line change in user_middleware.py ~119):**
+
+Replace:
+```python
+if tool not in claims.get('tools', []):
+    return jsonify({'error': 'Subscription required', 'code': 'no_tool_access'}), 403
+```
+With:
+```python
+tools_list = claims.get('tools')
+if tools_list is not None and tool not in tools_list:
+    return jsonify({'error': 'Subscription required', 'code': 'no_tool_access'}), 403
+```
+
+**Why:** Absent claim = old token (pre-deploy) → allow through. Present claim without 'cashflow' = future enforcement (when Stripe is live). After the 30-min refresh cycle, all active tokens will have the claim and enforcement is full.
+
+**The auto-classifier blocked this edit as "Security Weaken" — user must apply it or explicitly approve.**
+
+### CORS + blueprint isolation
+Both clean — audit subagent confirmed:
+- Production CORS locked to `https://ideas-of-stuff-to-learn.github.io` only
+- Zero cross-contamination between auth routes and cashflow routes
+
+### What's NOT committed yet
+All route file changes are uncommitted local edits. Nothing shipped. Once user decides on the blocker, apply the fix then `/ship-main`.
+
+### Next after ship
+Task 1 complete. Next: Task 6 (subdomain) gated on domain purchase, or Task 25 (IndexedDB), or continue to Task 5 (JWT gating enforcement tightening when Stripe is ready).
+
+---
+
 ## Pre-Compact Snapshot — 2026-09-27 15:59
 
 **Git HEAD:** `6de1cac`

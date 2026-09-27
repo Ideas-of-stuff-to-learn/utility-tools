@@ -98,9 +98,9 @@ def require_permission(permission_key):
     return decorator
 
 
-def require_auth(permission_key=None):
-    """Combined decorator: bundles @jwt_required() + optional permission
-    check into one annotation.
+def require_auth(permission_key=None, tool='cashflow'):
+    """Combined decorator: bundles @jwt_required() + tools-claim check +
+    optional permission check into one annotation.
 
         @app.route(...)
         @require_auth('categories.rename')
@@ -114,6 +114,9 @@ def require_auth(permission_key=None):
         @wraps(fn)
         @jwt_required()
         def wrapper(*args, **kwargs):
+            claims = get_jwt()
+            if tool not in claims.get('tools', []):
+                return jsonify({'error': 'Subscription required', 'code': 'no_tool_access'}), 403
             if permission_key:
                 current_user = int(get_jwt_identity())
                 conn = get_connection()

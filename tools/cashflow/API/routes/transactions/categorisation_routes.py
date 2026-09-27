@@ -14,10 +14,11 @@ and matching/ - this file is just wiring HTTP requests to those.
 from time import perf_counter
 
 from flask import request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
 
 from extensions import app, limiter
 from middleware.user_rate_limits import RL_CATEGORISE_CACHED, RL_CATEGORISE_LLM, RL_CATEGORISE_BATCH
+from middleware.user_middleware import require_auth
 from database import get_connection, release_connection
 from cache import CategoryCache
 from categorise.pipeline import run_cache_tiers
@@ -32,7 +33,7 @@ from shared import update_transaction_categories
 
 
 @app.route('/categorize/cached', methods=['POST'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_CATEGORISE_CACHED)
 def categorize_cached():
     current_user = int(get_jwt_identity())
@@ -60,7 +61,7 @@ def categorize_cached():
 
 
 @app.route('/categorize/cached/exact', methods=['POST'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_CATEGORISE_CACHED)
 def categorize_cached_exact():
     current_user = int(get_jwt_identity())
@@ -104,7 +105,7 @@ def categorize_cached_exact():
 
 
 @app.route('/categorize/cached/merchant', methods=['POST'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_CATEGORISE_CACHED)
 def categorize_cached_merchant():
     current_user = int(get_jwt_identity())
@@ -132,7 +133,7 @@ def categorize_cached_merchant():
 
 
 @app.route('/categorize/cached/similarity', methods=['POST'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_CATEGORISE_CACHED)
 def categorize_cached_similarity():
     current_user = int(get_jwt_identity())
@@ -160,7 +161,7 @@ def categorize_cached_similarity():
 
 
 @app.route('/categorize/llm', methods=['POST'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_CATEGORISE_LLM)
 def categorize_llm():
     current_user = int(get_jwt_identity())
@@ -228,7 +229,7 @@ def categorize_llm():
 
 
 @app.route('/categorize/resolve', methods=['POST'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_CATEGORISE_CACHED)
 def resolve_manual():
     current_user = int(get_jwt_identity())
@@ -301,7 +302,7 @@ def resolve_manual():
         
         
 @app.route('/categorize/resolve-and-exit', methods=['POST'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_CATEGORISE_BATCH)
 def resolve_and_exit():
     """Combined exit endpoint: saves any accumulated picks then bulk-resolves
@@ -381,7 +382,7 @@ def resolve_and_exit():
 
 
 @app.route('/categorize/resolve-remaining-to-other', methods=['POST'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_CATEGORISE_BATCH)
 def resolve_remaining_to_other():
     """The sendBeacon safety net for the manual-review blocking flow -
@@ -391,7 +392,7 @@ def resolve_remaining_to_other():
     is ever left in a broken, half-finished state. Takes no body at
     all - sendBeacon can't easily send custom headers/auth, but the
     httpOnly JWT cookie is sent automatically with any same-origin
-    request including sendBeacon, so @jwt_required() still works here
+    request including sendBeacon, so @require_auth() still works here
     unchanged.
     """
     current_user = int(get_jwt_identity())

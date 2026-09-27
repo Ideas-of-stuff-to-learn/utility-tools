@@ -6,17 +6,18 @@ Postgres via GROUP BY/SUM, so response size is bounded by
 (years x months x categories), not by raw transaction count.
 """
 from flask import jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
 
 from extensions import app, limiter
 from middleware.user_rate_limits import RL_READ_CHARTS
+from middleware.user_middleware import require_auth
 from database import get_connection, release_connection
 from checkingName import NEEDS_MANUAL_REVIEW
 from shared import TRANSIENT_CATEGORY_VALUES
 
 
 @app.route('/charts/summary', methods=['GET'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_READ_CHARTS)
 def charts_summary():
     """Pre-aggregated spending totals for the Charts screen - one row

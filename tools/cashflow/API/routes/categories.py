@@ -8,7 +8,7 @@ process-level in-memory caches (CategoryCache, the merchants cache) in
 place afterward, rather than invalidating and paying for a reload.
 """
 from flask import request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
 
 from extensions import app, limiter
 from middleware.user_rate_limits import RL_CATEGORY_WRITE, RL_READ_CATEGORIES
@@ -16,11 +16,11 @@ from database import get_connection, release_connection
 from cache import CategoryCache
 from matching import patch_merchants_category_rename
 from checkingName import NEEDS_MANUAL_REVIEW
-from middleware.user_middleware import require_permission, get_user_role_and_permissions
+from middleware.user_middleware import require_auth, require_permission, get_user_role_and_permissions
 import re
 
 @app.route('/categories', methods=['GET'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_READ_CATEGORIES)
 def get_categories():
     """Returns every user-facing category, in display order, with its
@@ -52,7 +52,7 @@ def get_categories():
         release_connection(conn)
 
 @app.route('/categories', methods=['PATCH'])
-@jwt_required()
+@require_auth()
 @limiter.limit(RL_CATEGORY_WRITE)
 def update_category():
     """Renames a category and/or changes its colour.
@@ -151,7 +151,7 @@ def update_category():
         release_connection(conn)
 
 @app.route('/categories/combine', methods=['PATCH'])
-@jwt_required()
+@require_auth()
 @require_permission('categories.combine')
 @limiter.limit(RL_CATEGORY_WRITE)
 def combine_categories():
@@ -251,7 +251,7 @@ def combine_categories():
         release_connection(conn)
 
 @app.route('/categories', methods=['DELETE'])
-@jwt_required()
+@require_auth()
 @require_permission('categories.delete')
 @limiter.limit(RL_CATEGORY_WRITE)
 def delete_category():
@@ -297,7 +297,7 @@ def delete_category():
 
 
 @app.route('/categories/cancel-delete', methods=['POST'])
-@jwt_required()
+@require_auth()
 @require_permission('categories.delete')
 @limiter.limit(RL_CATEGORY_WRITE)
 def cancel_delete_category():
@@ -334,7 +334,7 @@ def cancel_delete_category():
         release_connection(conn)
 
 @app.route('/categories', methods=['POST'])
-@jwt_required()
+@require_auth()
 @require_permission('categories.create')
 @limiter.limit(RL_CATEGORY_WRITE)
 def create_category():
@@ -396,7 +396,7 @@ def create_category():
 
 
 @app.route('/categories/order', methods=['PATCH'])
-@jwt_required()
+@require_auth()
 @require_permission('categories.reorder')
 @limiter.limit(RL_CATEGORY_WRITE)
 def reorder_categories():
@@ -462,7 +462,7 @@ def reorder_categories():
 
 
 @app.route('/categories/reset-defaults', methods=['POST'])
-@jwt_required()
+@require_auth()
 @require_permission('categories.recolor')
 @limiter.limit(RL_CATEGORY_WRITE)
 def reset_category_defaults():
@@ -506,7 +506,7 @@ def reset_category_defaults():
 
 
 @app.route('/categories/default-color', methods=['PATCH'])
-@jwt_required()
+@require_auth()
 @require_permission('categories.set_default_color')
 @limiter.limit(RL_CATEGORY_WRITE)
 def update_default_color():
