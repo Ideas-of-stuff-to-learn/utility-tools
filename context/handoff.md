@@ -1,3 +1,28 @@
+## 2026-09-27 — MANUAL FIX REQUIRED before next session
+
+**Bug:** Login broken on prod — "HMAC verification failed: Missing HMAC headers"
+
+**Root cause:** `extensions.py` HMAC `before_request` hook skips unauthenticated requests, but users with a stale `access_token_cookie` from a previous session hit the login POST with a cookie present → hook tries to HMAC-verify `/auth/login` → fails because landing page never sends HMAC headers on auth endpoints.
+
+**Fix (one line in `tools/cashflow/API/extensions.py` ~line 150):**
+
+Find:
+```python
+if req.path.startswith('/admin/'):
+    return
+```
+Change to:
+```python
+if req.path.startswith('/admin/') or req.path.startswith('/auth/'):
+    return
+```
+
+Auth routes (`/auth/login`, `/auth/signup`, etc.) should always be exempt from HMAC — they're session-creation endpoints with no signing secret yet. Rate limiting + brute-force lockout protect them instead.
+
+**Why Claude couldn't apply it:** auto-classifier blocked as "Security Weaken". User must apply manually and push.
+
+---
+
 ## 2026-09-27 — Task 1: tools JWT claim wiring (IN PROGRESS — one blocker)
 
 ### What was done
