@@ -1,30 +1,59 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { useTransactions } from './TransactionsContext';
 import { NEEDS_MANUAL_REVIEW, NOT_YET_CATEGORISED } from '../checkingName';
+import { getIdbKey, getIdbUserId } from '../api';
+import { get as idbGet, put as idbPut } from '../idb/store';
 
 const ChartFilterContext = createContext();
 
-// Category values that are placeholder/transient — excluded from chart aggregation.
-// Must stay in sync with server-side TRANSIENT_CATEGORY_VALUES in API/shared.py.
+// Must stay in sync with TRANSIENT_CATEGORY_VALUES in API/shared.py
 const EXCLUDED_CATEGORIES = new Set([NEEDS_MANUAL_REVIEW, NOT_YET_CATEGORISED, 'PENDING_LLM']);
-
-// Regex matching the DD/MM/YYYY date format stored in the DB.
 const DATE_RE = /^\d{2}\/\d{2}\/\d{4}$/;
+
+// Aggregates raw transactions into the {yearly, monthly} shape the chart
+// consumes — same GROUP BY the server-side /charts/summary used to do.
+function computeChartSummary(transactions) {
+    const yearlyMap  = new Map();
+    const monthlyMap = new Map();
+
+    for (const t of transactions) {
+        if (!t.category || EXCLUDED_CATEGORIES.has(t.category)) continue;
+        const date = t.date;
+        if (!DATE_RE.test(date)) continue;
+
+        const year   = parseInt(date.slice(6, 10), 10);
+        const month  = parseInt(date.slice(3, 5),  10);
+        const amount = Math.abs(parseFloat(t.amount) || 0);
+
+        const yk = `${year}\x00${t.category}`;
+        let yr = yearlyMap.get(yk);
+        if (!yr) { yr = { year, category: t.category, total: 0 }; yearlyMap.set(yk, yr); }
+        yr.total += amount;
+
+        const mk = `${year}\x00${month}\x00${t.category}`;
+        let mo = monthlyMap.get(mk);
+        if (!mo) { mo = { year, month, category: t.category, total: 0 }; monthlyMap.set(mk, mo); }
+        mo.total += amount;
+    }
+
+    return {
+        yearly:  [...yearlyMap.values()].sort((a, b) => a.year - b.year),
+        monthly: [...monthlyMap.values()].sort((a, b) => a.year - b.year || a.month - b.month),
+    };
+}
 
 export function ChartFilterProvider({ children }) {
     const { isLoggedIn } = useAuth();
     const { categoryNames, transactions } = useTransactions();
 
-    // chartDataVersion / bumpChartDataVersion are kept for backward
-    // compatibility — they are called from ~10 call sites after uploads
-    // and categorization. With chartSummary now derived from transactions
-    // via useMemo, bumping the version is no longer needed to trigger a
-    // refetch, but keeping it as a no-op avoids touching every call site.
+    const [chartSummary, setChartSummary] = useState({ yearly: [], monthly: [] });
+
+    // chartDataVersion / bumpChartDataVersion kept for call-site compatibility —
+    // called from ~10 places after uploads and categorization. Chart now updates
+    // automatically when transactions state changes so bumping is a no-op.
     const [chartDataVersion, setChartDataVersion] = useState(0);
-    const bumpChartDataVersion = useCallback(() => {
-        setChartDataVersion(t => t + 1);
-    }, []);
+    const bumpChartDataVersion = useCallback(() => setChartDataVersion(t => t + 1), []);
 
     const [contentsSelectedCategories, setContentsSelectedCategories] = useState(new Set());
     const seenContentsCategoriesRef = useRef(new Set());
@@ -32,43 +61,45 @@ export function ChartFilterProvider({ children }) {
     const [mobileSelectedCategories, setMobileSelectedCategories] = useState(new Set());
     const seenMobileCategoriesRef = useRef(new Set());
 
-    // Derive chart summary directly from transactions — same GROUP BY
-    // aggregation that /charts/summary runs server-side, but done
-    // client-side so it's instant for returning users (transactions load
-    // from IDB) and stays automatically in sync when transactions change
-    // after uploads or categorization.
-    const chartSummary = useMemo(() => {
-        if (!transactions || transactions.length === 0) return { yearly: [], monthly: [] };
+    // ── Phase 1: instant IDB warm-start ────────────────────────────────────
+    // Reads ONE pre-computed chart_summary blob (single decrypt, ~2ms) so
+    // hasData=true before transactions finish loading from IDB.
+    // This fires as soon as isLoggedIn flips — transactions haven't loaded yet.
+    useEffect(() => {
+        if (!isLoggedIn) return;
+        const cryptoKey = getIdbKey();
+        const userId    = getIdbUserId();
+        if (!cryptoKey || !userId) return;
 
-        const yearlyMap = new Map();
-        const monthlyMap = new Map();
+        idbGet(userId, 'preferences', 'chart_summary', cryptoKey)
+            .then(cached => {
+                if (cached?.yearly?.length > 0) setChartSummary(cached);
+            })
+            .catch(() => {});
+    }, [isLoggedIn]);
 
-        for (const t of transactions) {
-            if (!t.category || EXCLUDED_CATEGORIES.has(t.category)) continue;
-            const date = t.date;
-            if (!DATE_RE.test(date)) continue;
+    // ── Phase 2: recompute from full transactions ───────────────────────────
+    // Runs once transactions are in state (from IDB or server). Computes fresh
+    // aggregates and writes the result back to IDB so the next phase-1 read
+    // is always current.
+    useEffect(() => {
+        if (!transactions || transactions.length === 0) return;
+        const computed = computeChartSummary(transactions);
+        if (computed.yearly.length === 0) return;
 
-            const year  = parseInt(date.slice(6, 10), 10);
-            const month = parseInt(date.slice(3, 5), 10);
-            const amount = Math.abs(parseFloat(t.amount) || 0);
+        setChartSummary(computed);
 
-            // yearly aggregate
-            const yk = `${year}\x00${t.category}`;
-            let yr = yearlyMap.get(yk);
-            if (!yr) { yr = { year, category: t.category, total: 0 }; yearlyMap.set(yk, yr); }
-            yr.total += amount;
-
-            // monthly aggregate
-            const mk = `${year}\x00${month}\x00${t.category}`;
-            let mo = monthlyMap.get(mk);
-            if (!mo) { mo = { year, month, category: t.category, total: 0 }; monthlyMap.set(mk, mo); }
-            mo.total += amount;
+        const cryptoKey = getIdbKey();
+        const userId    = getIdbUserId();
+        if (cryptoKey && userId) {
+            idbPut(userId, 'preferences', 'chart_summary', computed, cryptoKey).catch(() => {});
         }
-
-        const yearly  = [...yearlyMap.values()].sort((a, b) => a.year - b.year);
-        const monthly = [...monthlyMap.values()].sort((a, b) => a.year - b.year || a.month - b.month);
-        return { yearly, monthly };
     }, [transactions]);
+
+    // ── Reset on logout ─────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!isLoggedIn) setChartSummary({ yearly: [], monthly: [] });
+    }, [isLoggedIn]);
 
     const toggleContentsCategory = useCallback((cat) => {
         setContentsSelectedCategories(prev => {
