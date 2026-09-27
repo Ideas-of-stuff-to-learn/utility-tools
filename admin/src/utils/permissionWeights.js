@@ -24,9 +24,11 @@ export const PERMISSION_WEIGHTS = {
     'email.bypass_ratelimit':       29,
 };
 
-/** Return a clamped 1-99 level derived purely from permission weights. */
+const TOTAL_ALL = Object.values(PERMISSION_WEIGHTS).reduce((a, b) => a + b, 0);
+
+/** Return a 0-100 level normalized so all permissions = 100. */
 export function computeRoleLevel(permissionKeys) {
     if (!permissionKeys || permissionKeys.length === 0) return 0;
     const total = permissionKeys.reduce((sum, k) => sum + (PERMISSION_WEIGHTS[k] ?? 0), 0);
-    return Math.max(1, Math.min(100, total));
+    return Math.round(total / TOTAL_ALL * 100);
 }

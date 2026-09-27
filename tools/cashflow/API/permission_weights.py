@@ -27,9 +27,12 @@ PERMISSION_WEIGHTS = {
 }
 
 
+_TOTAL_ALL = sum(PERMISSION_WEIGHTS.values())
+
+
 def compute_role_level(permission_keys):
-    """Return a clamped 1-99 level derived purely from permission weights."""
+    """Return a 0-100 level normalized so all permissions = 100."""
     if not permission_keys:
         return 0
     total = sum(PERMISSION_WEIGHTS.get(k, 0) for k in permission_keys)
-    return max(1, min(100, total))
+    return round(total / _TOTAL_ALL * 100)
