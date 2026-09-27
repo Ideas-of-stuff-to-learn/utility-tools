@@ -549,6 +549,102 @@ def admin_delete_account(target_id):
         release_connection(conn)
 
 
+@app.route('/admin/accounts/<int:target_id>', methods=['PATCH'])
+@require_admin_auth('admin.accounts.manage')
+@limiter.limit(RL_AUTH_ME)
+def admin_edit_account(target_id):
+    """Change the role of an admin account. Cannot edit your own or accounts at/above your level."""
+    caller_id = g.admin_user_id
+    if target_id == caller_id:
+        return jsonify({'error': 'Cannot edit your own account'}), 400
+
+    data = request.get_json() or {}
+    role_name = (data.get('role') or '').strip()
+    if not role_name:
+        return jsonify({'error': 'role is required'}), 400
+
+    conn = get_connection()
+    try:
+        caller_role, caller_level, _ = get_admin_role_and_permissions(conn, caller_id)
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT au.username, r.level FROM admin_users au LEFT JOIN roles r ON au.role_id = r.id WHERE au.id = %s",
+                (target_id,),
+            )
+            row = cur.fetchone()
+        if not row:
+            return jsonify({'error': 'Account not found'}), 404
+        username, target_level = row
+        if caller_role != 'owner' and (target_level or 0) >= caller_level:
+            return jsonify({'error': f'Cannot edit an account at or above your own level ({caller_level})'}), 403
+
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, level FROM roles WHERE name = %s", (role_name,))
+            role_row = cur.fetchone()
+        if not role_row:
+            return jsonify({'error': f'Role "{role_name}" not found'}), 404
+        role_id, role_level = role_row
+
+        if role_level < ADMIN_ACCOUNT_MIN_LEVEL:
+            return jsonify({'error': f'Role level {role_level} is below the minimum allowed ({ADMIN_ACCOUNT_MIN_LEVEL})'}), 403
+        if caller_role != 'owner' and role_level >= caller_level:
+            return jsonify({'error': f'Cannot assign a role at or above your own level ({caller_level})'}), 403
+
+        with conn.cursor() as cur:
+            cur.execute("UPDATE admin_users SET role_id = %s WHERE id = %s", (role_id, target_id))
+        _write_audit(conn, caller_id, 'admin.account.edit_role', 'admin_user', target_id,
+                     {'username': username, 'new_role': role_name, 'new_level': role_level})
+        conn.commit()
+        return jsonify({'account': {'id': target_id, 'username': username, 'role': role_name, 'level': role_level}}), 200
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f'admin_edit_account failed: {e}')
+        return jsonify({'error': 'Edit failed'}), 500
+    finally:
+        release_connection(conn)
+
+
+@app.route('/admin/accounts/<int:target_id>/reset-mfa', methods=['POST'])
+@require_admin_auth('admin.accounts.manage')
+@limiter.limit(RL_AUTH_ME)
+def admin_reset_mfa(target_id):
+    """Clear TOTP secret and enrolled flag — forces re-enrolment on next login."""
+    caller_id = g.admin_user_id
+    if target_id == caller_id:
+        return jsonify({'error': 'Cannot reset your own MFA from here'}), 400
+
+    conn = get_connection()
+    try:
+        caller_role, caller_level, _ = get_admin_role_and_permissions(conn, caller_id)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT au.username, r.level FROM admin_users au LEFT JOIN roles r ON au.role_id = r.id WHERE au.id = %s",
+                (target_id,),
+            )
+            row = cur.fetchone()
+        if not row:
+            return jsonify({'error': 'Account not found'}), 404
+        username, target_level = row
+        if caller_role != 'owner' and (target_level or 0) >= caller_level:
+            return jsonify({'error': f'Cannot reset MFA for an account at or above your own level ({caller_level})'}), 403
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE admin_users SET totp_secret = NULL, totp_enrolled = false WHERE id = %s",
+                (target_id,),
+            )
+        _write_audit(conn, caller_id, 'admin.account.reset_mfa', 'admin_user', target_id, {'username': username})
+        conn.commit()
+        return jsonify({'status': 'ok', 'username': username}), 200
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f'admin_reset_mfa failed: {e}')
+        return jsonify({'error': 'MFA reset failed'}), 500
+    finally:
+        release_connection(conn)
+
+
 # ── Flask CLI bootstrap ───────────────────────────────────────────────────────
 
 import click

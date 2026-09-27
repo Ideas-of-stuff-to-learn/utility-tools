@@ -285,6 +285,20 @@ export async function deleteAdminAccount(id) {
     return parseJson(r, 'Failed to delete admin account');
 }
 
+export async function editAdminAccount(id, { role }) {
+    const r = await authFetch(`${BASE_URL}/admin/accounts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+    });
+    return (await parseJson(r, 'Failed to update admin account')).account;
+}
+
+export async function resetAdminMfa(id) {
+    const r = await authFetch(`${BASE_URL}/admin/accounts/${id}/reset-mfa`, { method: 'POST' });
+    return parseJson(r, 'Failed to reset MFA');
+}
+
 // ── Admin — audit log ─────────────────────────────────────────────────────────
 
 export async function getAuditLog({ action = '', actor = '', limit = 200 } = {}) {

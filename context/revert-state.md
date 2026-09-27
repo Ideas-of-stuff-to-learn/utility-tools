@@ -1,4 +1,6 @@
 <!-- last-verified: f366d81 2026-09-24 -->
+2026-09-27 | task: admin accounts edit role + reset MFA buttons | safe-point: cad7fcf40b3be4151583550a963c6eee54e8492d | status: in-progress
+2026-09-27 | task: admin.accounts.manage permission gate (sidebar + backend + weights) | safe-point: cad7fcf40b3be4151583550a963c6eee54e8492d | status: complete
 2026-09-27 | task: global admin audit log | safe-point: ffdc15738ac2cf0ae39b1807d4b8afad12ee5215 | status: complete
 2026-09-27 | task: permission-derived role levels + ADMIN_LEVEL_OVERRIDE_MIN | safe-point: 10f3bf4f0e00b836ebe0b9fc8542f1d0c2596e4e | status: complete
 2026-09-27 | task: add start-dev.bat for unified local dev startup | safe-point: 10f3bf4f0e00b836ebe0b9fc8542f1d0c2596e4e | status: complete

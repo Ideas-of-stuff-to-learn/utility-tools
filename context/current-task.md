@@ -1,11 +1,19 @@
 <!-- last-verified: a834bca 2026-09-23 -->
 # Cashflow2.0 — Current Task
 
-## Status (2026-09-24)
+## Status (2026-09-27)
 
-No active task. Level-ceiling enforcement + email CC matrix complete.
+No active task. admin.accounts.manage permission gate complete.
 
 **Next session:** Task 8 — Google/Microsoft OAuth. Note: auth now lives on the landing page, so OAuth buttons + callback routes go in landing, not Cashflow. Cashflow only needs RequireAuth to redirect to landing login on unauthenticated.
+
+## Recently Completed
+
+**admin.accounts.manage permission gate (2026-09-27):**
+- Sidebar.jsx: Admin Accounts NavLink hidden unless owner or has admin.accounts.manage
+- admin_auth.py: all 3 /admin/accounts endpoints now gated by admin.accounts.manage (replacing users.view / users.create / users.delete)
+- permission_weights.py + permissionWeights.js: admin.accounts.manage weight = 33
+- schema.sql: INSERT admin.accounts.manage permission + admin_audit_log table + audit log endpoint
 
 ## Recently Completed
 
