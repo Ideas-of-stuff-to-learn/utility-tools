@@ -1,4 +1,4 @@
-## 2026-09-27 — MANUAL FIX REQUIRED before next session
+## 2026-09-27 — HMAC login bug fix (SHIPPED e5d4d9b)
 
 **Bug:** Login broken on prod — "HMAC verification failed: Missing HMAC headers"
 
