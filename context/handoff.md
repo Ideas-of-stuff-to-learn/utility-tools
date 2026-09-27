@@ -1,3 +1,50 @@
+## 2026-09-27 — Admin panel shipped + permission-derived role levels
+
+**Git HEAD:** `060a206` (main, pushed)
+
+### What was done
+
+**Admin panel (Tasks 27+26+23) — all shipped:**
+- `admin_users` table completely separate from cashflow `users` — credential isolation
+- TOTP two-step login: credentials → temp_token → TOTP verify → session cookies (`admin_access_token` / `admin_refresh_token`)
+- `admin_auth.py`: full auth flow, TOTP enrolment on first login, `/admin/me`, account CRUD
+- `require_admin_auth(permission_key)` decorator for all admin routes
+- Admin panel Vite/React app (`admin/`): Login, TOTP setup, sidebar, Users, Roles, Unlock Account, Admin Accounts screens
+- `ForgotPasswordScreen` replaced with info page (contact owner to reset)
+- "Not authorised to edit" shown for same/higher-level rows; "N/A" in Unlock for non-locked accounts
+- `ADMIN_ACCOUNT_MIN_LEVEL=30` — floor below which roles can't be assigned to admin accounts (env var, Render + local)
+
+**Permission-derived role levels:**
+- `tools/cashflow/API/permission_weights.py` + `admin/src/utils/permissionWeights.js` — canonical weight table (18 permissions, unique values, sum clamped 1–99)
+- `computeRoleLevel()` derives level purely from selected permissions
+- `RolesScreen.jsx` — level is auto-computed read-only; red non-button replaces Save when computed level ≥ caller's level
+- `ADMIN_LEVEL_OVERRIDE_MIN=80` — admins at/above this level get editable override field; formula shown as suggestion; hard cap: can't set ≥ own level
+- Backend (`admin.py`) recomputes level server-side, rejects mismatches, enforces override privilege
+- Level 0 when no permissions selected (not 1); Select All / Deselect All buttons in role modal
+
+**Local dev infra:**
+- `dev.config.env` — single source of truth for ports + thresholds
+- `start-dev.bat` — reads config, writes `.env` files, launches all four servers
+- Flask on port 5050 (5000 stolen by Windows svchost)
+- CORS regex `r"http://localhost(:\d+)?$"` allows all localhost ports in dev
+- Admin panel link in ProfilePopup fixed (was looping back to landing page)
+
+### Render env vars to add (not yet added)
+- `ADMIN_ACCOUNT_MIN_LEVEL=30`
+- `ADMIN_LEVEL_OVERRIDE_MIN=80`
+
+### Still to do / open
+- Delete the "admin" role from Supabase (randomly created, no one using it):
+  ```sql
+  SELECT COUNT(*) FROM admin_users WHERE role_id = (SELECT id FROM roles WHERE name = 'admin');
+  -- if 0:
+  DELETE FROM roles WHERE name = 'admin';
+  ```
+- Add `admin.accounts.manage` permission for tab visibility gate (discussed, not yet implemented)
+- Local testing in progress — user was verifying role level formula and Select All behaviour
+
+---
+
 ## Pre-Compact Snapshot — 2026-09-27 00:44
 
 **Git HEAD:** `10f3bf4`

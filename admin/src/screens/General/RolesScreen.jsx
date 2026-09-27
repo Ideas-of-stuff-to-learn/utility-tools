@@ -96,6 +96,10 @@ function RoleModal({ role, allPermissions, allRoles, caller, onSave, onClose }) 
                 </div>
                 <div className="form-row">
                     <label className="form-label">Permissions</label>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelected(new Set(allPermissions.filter(p => grantablePerms.has(p.key)).map(p => p.key)))}>Select all</button>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelected(new Set())}>Deselect all</button>
+                    </div>
                     <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {allPermissions.map(p => {
                             const canGrant = grantablePerms.has(p.key);

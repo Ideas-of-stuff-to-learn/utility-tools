@@ -29,6 +29,6 @@ PERMISSION_WEIGHTS = {
 def compute_role_level(permission_keys):
     """Return a clamped 1-99 level derived purely from permission weights."""
     if not permission_keys:
-        return 1
+        return 0
     total = sum(PERMISSION_WEIGHTS.get(k, 0) for k in permission_keys)
     return max(1, min(99, total))
