@@ -8,6 +8,7 @@ LOCAL_IP               = os.environ.get('LOCAL_IP', '')
 BACKEND_PORT           = int(os.environ.get('BACKEND_PORT', 5050))
 ADMIN_ACCOUNT_MIN_LEVEL    = int(os.environ.get('ADMIN_ACCOUNT_MIN_LEVEL', 30))
 ADMIN_LEVEL_OVERRIDE_MIN   = int(os.environ.get('ADMIN_LEVEL_OVERRIDE_MIN', 80))
+ADMIN_AUDIT_MIN_LEVEL      = int(os.environ.get('ADMIN_AUDIT_MIN_LEVEL', 60))
 
 CORS_ORIGINS = (
     [r"http://localhost(:\d+)?$", rf"http://{LOCAL_IP}(:\d+)?$"]

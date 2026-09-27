@@ -4,9 +4,13 @@ const LANDING_URL = import.meta.env.PROD
     ? 'https://ideas-of-stuff-to-learn.github.io/utility-tools/'
     : 'http://localhost:5174/';
 
+const AUDIT_MIN = parseInt(import.meta.env.VITE_ADMIN_AUDIT_MIN_LEVEL ?? '60', 10);
+
 export default function Sidebar({ user, onLogout }) {
     const displayName = user?.display_name || user?.username || '—';
     const role = user?.role || '';
+    const level = user?.level ?? 0;
+    const canSeeAudit = user?.role === 'owner' || level >= AUDIT_MIN;
 
     return (
         <nav className="admin-sidebar">
@@ -22,7 +26,8 @@ export default function Sidebar({ user, onLogout }) {
             <NavLink className="admin-nav-item" to="/general/roles">Roles &amp; Permissions</NavLink>
             <NavLink className="admin-nav-item" to="/general/admin-accounts">Admin Accounts</NavLink>
             <NavLink className="admin-nav-item" to="/general/unlock">Unlock Account</NavLink>
-            <NavLink className="admin-nav-item" to="/general/impersonation-log">Impersonation Log</NavLink>
+            {canSeeAudit && <NavLink className="admin-nav-item" to="/general/impersonation-log">Impersonation Log</NavLink>}
+            {canSeeAudit && <NavLink className="admin-nav-item" to="/general/audit-log">Audit Log</NavLink>}
 
             <div className="admin-sidebar-section">Cashflow</div>
             <NavLink className="admin-nav-item" to="/cashflow/categories">Categories</NavLink>

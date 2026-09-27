@@ -284,3 +284,14 @@ export async function deleteAdminAccount(id) {
     const r = await authFetch(`${BASE_URL}/admin/accounts/${id}`, { method: 'DELETE' });
     return parseJson(r, 'Failed to delete admin account');
 }
+
+// ── Admin — audit log ─────────────────────────────────────────────────────────
+
+export async function getAuditLog({ action = '', actor = '', limit = 200 } = {}) {
+    const params = new URLSearchParams();
+    if (action) params.set('action', action);
+    if (actor)  params.set('actor', actor);
+    params.set('limit', limit);
+    const r = await authFetch(`${BASE_URL}/admin/audit?${params}`);
+    return (await parseJson(r, 'Failed to fetch audit log')).log;
+}

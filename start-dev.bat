@@ -50,6 +50,7 @@ echo [config] Ports: backend=%BACKEND_PORT% cashflow=%CASHFLOW_PORT% landing=%LA
     echo VITE_ADMIN_PORT=%ADMIN_PORT%
     echo VITE_ADMIN_ACCOUNT_MIN_LEVEL=%ADMIN_ACCOUNT_MIN_LEVEL%
     echo VITE_ADMIN_LEVEL_OVERRIDE_MIN=%ADMIN_LEVEL_OVERRIDE_MIN%
+    echo VITE_ADMIN_AUDIT_MIN_LEVEL=%ADMIN_AUDIT_MIN_LEVEL%
 ) > "%ROOT%admin\.env"
 
 echo [config] Written .env files for cashflow, landing, admin

@@ -11,6 +11,7 @@ import RolesScreen from './screens/General/RolesScreen.jsx';
 import AdminAccountsScreen from './screens/General/AdminAccountsScreen.jsx';
 import UnlockScreen from './screens/General/UnlockScreen.jsx';
 import ImpersonationLogScreen from './screens/General/ImpersonationLogScreen.jsx';
+import AuditLogScreen from './screens/General/AuditLogScreen.jsx';
 import CategoriesScreen from './screens/Cashflow/CategoriesScreen.jsx';
 import UserTransactionsScreen from './screens/Cashflow/UserTransactionsScreen.jsx';
 
@@ -31,6 +32,7 @@ function AdminApp({ user, onLogout }) {
                     <Route path="/general/admin-accounts" element={<AdminAccountsScreen caller={caller} />} />
                     <Route path="/general/unlock" element={<UnlockScreen />} />
                     <Route path="/general/impersonation-log" element={<ImpersonationLogScreen />} />
+                    <Route path="/general/audit-log" element={<AuditLogScreen />} />
                     <Route path="/cashflow/categories" element={<CategoriesScreen />} />
                     <Route path="/cashflow/user-transactions" element={<UserTransactionsScreen caller={caller} />} />
                     <Route path="*" element={<Navigate to="/general/users" replace />} />

@@ -27,7 +27,8 @@ from permissions import (
 )
 from email_service import send_email
 from permission_weights import compute_role_level
-from backendLocalConfig import ADMIN_LEVEL_OVERRIDE_MIN
+from backendLocalConfig import ADMIN_LEVEL_OVERRIDE_MIN, ADMIN_AUDIT_MIN_LEVEL
+from audit import write_audit as _write_audit
 
 _CLEANUP_SECRET = os.environ.get('CLEANUP_SECRET', '')
 
@@ -182,6 +183,7 @@ def admin_create_role():
             level = computed_level
 
         role = create_role(conn, name, level, permission_keys)
+        _write_audit(conn, current_user, 'roles.create', 'role', role.get('id'), {'name': name, 'level': level, 'permissions': permission_keys})
         conn.commit()
         return jsonify({'role': role}), 201
     except ValueError as e:
@@ -238,6 +240,7 @@ def admin_update_role(role_id):
                 return jsonify({'error': f'Cannot set a role to your level or above ({caller_level})'}), 403
 
         role = update_role(conn, role_id, level=level, permission_keys=permission_keys)
+        _write_audit(conn, current_user, 'roles.edit', 'role', role_id, {'level': level, 'permissions': permission_keys})
         conn.commit()
         return jsonify({'role': role}), 200
     except ValueError as e:
@@ -277,6 +280,7 @@ def admin_delete_role(role_id):
                 "UPDATE roles SET pending_deletion_at = %s, pending_deletion_by_email = %s WHERE id = %s",
                 (now, actor_email, role_id)
             )
+        _write_audit(conn, current_user, 'roles.delete', 'role', role_id, {'name': role['name']})
         conn.commit()
         owner_email = _get_owner_email(conn)
         _send_deletion_scheduled_email(actor_email, owner_email, 'role', role['name'], now)
@@ -498,6 +502,7 @@ def admin_assign_role(target_user_id):
             return jsonify({'error': f'Cannot assign a role at or above your own level ({caller_level})'}), 403
 
         user = assign_user_role(conn, target_user_id, role_name)
+        _write_audit(conn, current_user, 'users.assign_role', 'user', target_user_id, {'role': role_name})
         conn.commit()
         return jsonify({'user': user}), 200
     except ValueError as e:
@@ -733,6 +738,7 @@ def admin_impersonate_user(target_user_id):
                 "INSERT INTO impersonation_log (actor_admin_user_id, target_user_id, jti) VALUES (%s, %s, %s)",
                 (current_user, target_user_id, jti),
             )
+        _write_audit(conn, current_user, 'users.impersonate', 'user', target_user_id)
         conn.commit()
 
         return jsonify({
@@ -941,6 +947,66 @@ def admin_unlock_user(target_user_id):
         conn.rollback()
         app.logger.error(f'Unlock failed for user {target_user_id}: {e}')
         return jsonify({'error': 'Unlock failed - please try again'}), 500
+    finally:
+        release_connection(conn)
+
+
+@app.route('/admin/audit', methods=['GET'])
+@require_admin_auth()
+@limiter.limit(RL_READ_ADMIN)
+def admin_audit_log():
+    """Global admin activity log. Gated by caller level >= ADMIN_AUDIT_MIN_LEVEL."""
+    current_user = g.admin_user_id
+    conn = get_connection()
+    try:
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
+        if caller_role != 'owner' and caller_level < ADMIN_AUDIT_MIN_LEVEL:
+            return jsonify({'error': 'Insufficient level to view audit log'}), 403
+
+        action_filter = request.args.get('action', '').strip()
+        actor_filter  = request.args.get('actor', '').strip()
+        limit         = min(int(request.args.get('limit', 200)), 500)
+
+        where_clauses = []
+        params = []
+        if action_filter:
+            where_clauses.append("aal.action = %s")
+            params.append(action_filter)
+        if actor_filter:
+            where_clauses.append("au.username ILIKE %s")
+            params.append(f'%{actor_filter}%')
+        where_sql = ('WHERE ' + ' AND '.join(where_clauses)) if where_clauses else ''
+        params.append(limit)
+
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""SELECT aal.id, aal.created_at, au.username AS actor,
+                           aal.action, aal.target_type, aal.target_id, aal.detail
+                    FROM admin_audit_log aal
+                    LEFT JOIN admin_users au ON aal.actor_admin_id = au.id
+                    {where_sql}
+                    ORDER BY aal.created_at DESC
+                    LIMIT %s""",
+                params,
+            )
+            rows = cur.fetchall()
+
+        log = [
+            {
+                'id':          row[0],
+                'created_at':  row[1].isoformat(),
+                'actor':       row[2] or 'unknown',
+                'action':      row[3],
+                'target_type': row[4],
+                'target_id':   row[5],
+                'detail':      row[6],
+            }
+            for row in rows
+        ]
+        return jsonify({'log': log}), 200
+    except Exception as e:
+        app.logger.error(f'admin_audit_log failed: {e}')
+        return jsonify({'error': 'Failed to fetch audit log'}), 500
     finally:
         release_connection(conn)
 

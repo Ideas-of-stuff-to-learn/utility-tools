@@ -38,6 +38,7 @@ from permissions import (
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from backendLocalConfig import ADMIN_ACCOUNT_MIN_LEVEL
+from audit import write_audit as _write_audit
 
 _ADMIN_TEMP_EXPIRES    = timedelta(minutes=5)
 _ADMIN_ACCESS_EXPIRES  = timedelta(hours=2)
@@ -500,6 +501,7 @@ def admin_create_account():
                 (username, hashed, role_id, caller_id),
             )
             new_id = cur.fetchone()[0]
+        _write_audit(conn, caller_id, 'admin.account.create', 'admin_user', new_id, {'username': username, 'role': role_name})
         conn.commit()
         return jsonify({'account': {'id': new_id, 'username': username, 'role': role_name, 'level': role_level}}), 201
     except Exception as e:
@@ -536,6 +538,7 @@ def admin_delete_account(target_id):
 
         with conn.cursor() as cur:
             cur.execute("DELETE FROM admin_users WHERE id = %s", (target_id,))
+        _write_audit(conn, caller_id, 'admin.account.delete', 'admin_user', target_id, {'username': username})
         conn.commit()
         return jsonify({'status': 'ok', 'deleted_username': username}), 200
     except Exception as e:

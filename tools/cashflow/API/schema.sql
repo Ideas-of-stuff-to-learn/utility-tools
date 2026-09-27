@@ -423,3 +423,24 @@ CREATE INDEX IF NOT EXISTS idx_admin_login_log_admin_user_id ON admin_login_log 
 -- Allow impersonation_log to record admin-panel actors separately
 ALTER TABLE impersonation_log ALTER COLUMN actor_user_id DROP NOT NULL;
 ALTER TABLE impersonation_log ADD COLUMN IF NOT EXISTS actor_admin_user_id INTEGER REFERENCES admin_users(id) ON DELETE SET NULL;
+
+-- =====================================================================
+-- Global admin audit log (Task: audit log tab)
+-- One row per significant admin action. actor_admin_id is the admin
+-- account that performed it. action is a dot-namespaced key matching
+-- the permission that gates it (e.g. 'users.delete', 'roles.manage').
+-- target_type / target_id identify what was acted on; detail is a
+-- free-form JSON blob for extra context (old/new values etc.).
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id              BIGSERIAL PRIMARY KEY,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    actor_admin_id  INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
+    action          TEXT NOT NULL,
+    target_type     TEXT,
+    target_id       TEXT,
+    detail          JSONB
+);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_created_at  ON admin_audit_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_actor       ON admin_audit_log (actor_admin_id);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_action      ON admin_audit_log (action);
