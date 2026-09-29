@@ -1,3 +1,13 @@
+## Pre-Compact Snapshot — 2026-09-29 15:17
+
+**Git HEAD:** `d82ff1e`
+**Files touched:** context/revert-state.md, context/session-snapshot.md
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
 ## Pre-Compact Snapshot — 2026-09-28 00:00
 
 **Git HEAD:** `fa5417b`

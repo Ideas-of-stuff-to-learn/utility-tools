@@ -76,4 +76,5 @@ Use `git revert` when changes have already been pushed to origin.
 2026-09-27 | task: canvas chart renderer + idbReady race fix + full IDB chart persistence | safe-point: f87235b | status: complete
 2026-09-27 | task: fix React #310 hooks order in StackChartCanvas — move early return after hooks | safe-point: 7d23ce3 | status: complete
 2026-09-28 | task: fix oscillation — idbReady re-run flashes spinner + auth/me 500 + AESGCM keyword arg | safe-point: fa5417b69fd6bcbea7f7805a5f89dc3d68d373a6 | status: complete
-2026-09-29 | task: admin panel — user-level accounts tab in AdminAccountsScreen | safe-point: 0836b6e3b56da99bdf0f67814eefd1afbe4d4c4f | status: in-progress
+2026-09-29 | task: admin panel — user-level accounts tab in AdminAccountsScreen | safe-point: 0836b6e3b56da99bdf0f67814eefd1afbe4d4c4f | status: complete
+2026-09-29 | task: split admin/user accounts into separate sidebar screens | safe-point: d82ff1e88ead814efe741734d1baa713f1c8e0a2 | status: in-progress
