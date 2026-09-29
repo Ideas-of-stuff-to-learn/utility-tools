@@ -12,8 +12,9 @@ const TransactionsContext = createContext();
 const TXN_STORE         = 'transactions';
 const CAT_STORE         = 'categories';
 const UPLOAD_STORE      = 'upload_stats';
-const MAX_AGE_TXN_MS    = 5 * 60 * 1000;   // 5 min
-const MAX_AGE_UPLOAD_MS = 2 * 60 * 1000;   // 2 min
+const MAX_AGE_TXN_MS    = 30 * 60 * 1000;  // 30 min
+const MAX_AGE_CAT_MS    = 60 * 60 * 1000;  // 60 min (categories change rarely)
+const MAX_AGE_UPLOAD_MS =  5 * 60 * 1000;  //  5 min
 
 // ── IDB helpers ────────────────────────────────────────────────────────────
 
@@ -50,6 +51,7 @@ async function idbWriteCategories(cats) {
     for (const c of cats) {
         await idbPut(userId, CAT_STORE, c.name, c, cryptoKey);
     }
+    await setMeta(userId, CAT_STORE, { cached_at: Date.now() }, cryptoKey);
 }
 
 async function idbReadUploadStats() {
@@ -174,25 +176,33 @@ export function TransactionsProvider({ children }) {
                 const userId    = getIdbUserId();
                 const cryptoKey = getIdbKey();
 
-                const [txnMeta, uploadMeta] = await Promise.all([
+                const [txnMeta, catMeta, uploadMeta] = await Promise.all([
                     userId && cryptoKey ? getMeta(userId, TXN_STORE, cryptoKey) : null,
+                    userId && cryptoKey ? getMeta(userId, CAT_STORE, cryptoKey) : null,
                     userId && cryptoKey ? getMeta(userId, UPLOAD_STORE, cryptoKey) : null,
                 ]);
 
-                const [cats, count, breakdown] = await Promise.all([
-                    getCategories(signal),
-                    getUploadCount(signal),
-                    getUploadBreakdown(),
+                const catStale    = !cachedCats?.length  || isStale(catMeta,    { maxAgeMs: MAX_AGE_CAT_MS });
+                const uploadStale = !cachedUpload         || isStale(uploadMeta, { maxAgeMs: MAX_AGE_UPLOAD_MS });
+
+                const [catsResult, uploadResult] = await Promise.all([
+                    catStale    ? getCategories(signal) : null,
+                    uploadStale ? Promise.all([getUploadCount(signal), getUploadBreakdown()]) : null,
                 ]);
                 if (cancelled) return;
 
-                // Categories — always use server version, check IDB version signal
-                setCategories(cats.categories ?? cats);
-                idbWriteCategories(cats.categories ?? cats);
+                if (catsResult) {
+                    const catsArr = catsResult.categories ?? catsResult;
+                    setCategories(catsArr);
+                    idbWriteCategories(catsArr);
+                }
 
-                setUploadCount(count);
-                setUploadBreakdown(breakdown);
-                idbWriteUploadStats({ count, breakdown });
+                if (uploadResult) {
+                    const [count, breakdown] = uploadResult;
+                    setUploadCount(count);
+                    setUploadBreakdown(breakdown);
+                    idbWriteUploadStats({ count, breakdown });
+                }
 
                 // Transactions — fetch if stale or IDB was empty
                 const txnStale = isStale(txnMeta, { maxAgeMs: MAX_AGE_TXN_MS });

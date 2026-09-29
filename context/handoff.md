@@ -1,3 +1,45 @@
+## Pre-Compact Snapshot — 2026-09-29 21:48
+
+**Git HEAD:** `c4709fa`
+**Files touched:** tools/cashflow/WebUI/src/components/ProfilePopup.jsx, context/revert-state.md, context/handoff.md, tools/cashflow/WebUI/src/appState/TransactionsContext.jsx, tools/cashflow/WebUI/src/customHooks/homescreen/useLogout.jsx
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
+## 2026-09-29 — Spinner/oscillation fixes + admin accounts split (IN PROGRESS)
+
+**Git HEAD:** `c4709fa` (pushed)
+
+### Shipped this session
+
+**Admin accounts → separate sidebar screens (51873ce, bc2446c):**
+- Split tab-based `AdminAccountsScreen` into two separate screens
+- `AdminAccountsScreen.jsx` — admin-only (level ≥ MIN_LEVEL)
+- `UserAccountsScreen.jsx` — new file for user-level accounts (0 < level < MIN_LEVEL)
+- `App.jsx` + `Sidebar.jsx` — new `/general/user-accounts` route + nav link
+
+**Second-visit spinner oscillation fix (c4709fa):**
+- Root cause: `auth_hint` in sessionStorage made `isLoggedIn=true` on mount while `idbReady=false`; TransactionsContext effect fired immediately with partial state → spinner, empty IDB read, server fetch start; when `getMe()` resolved `idbReady` flipped, effect re-ran with `firstLoadDoneRef` still false → spinner again
+- Fix: `TransactionsContext.jsx` — gate effect on `!isLoggedIn || !idbReady` so it never fires with partial state
+
+**REGRESSION introduced (not yet shipped fix):**
+- `endSession()` calls added to `useLogout.jsx` and `ProfilePopup.jsx` caused `RequiresAuth` to catch `isLoggedIn=false` and redirect to login → cookies still valid → auto-redirected back to cashflow instead of landing page
+- **Reverted** both `endSession()` additions — `useLogout.jsx` and `ProfilePopup.jsx` restored to original behaviour
+
+### Active investigation
+
+IDB not persisting between visits — background agent running. Symptom: every return fetches fresh from server, "server starting" message appears even on warm server. Likely cause: IDB write not completing, or staleness TTL too short, or `idbReady=true` before crypto key is actually set.
+
+### What still needs doing
+
+1. Apply IDB persistence fix (pending agent report)
+2. Build WebUI
+3. Commit + ship
+
+---
+
 ## Pre-Compact Snapshot — 2026-09-29 15:17
 
 **Git HEAD:** `d82ff1e`

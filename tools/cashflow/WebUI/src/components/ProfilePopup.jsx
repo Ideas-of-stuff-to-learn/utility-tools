@@ -4,7 +4,7 @@ import { useAuth } from '../appState';
 import '../styles/ProfilePopup.css';
 
 export default function ProfilePopup({ onClose }) {
-    const { userRole, endSession } = useAuth();
+    const { userRole } = useAuth();
     const navigate = useNavigate();
     const popupRef = useRef(null);
 
@@ -20,7 +20,6 @@ export default function ProfilePopup({ onClose }) {
 
     function handleBackToTools() {
         onClose();
-        endSession();
         window.location.href = import.meta.env.PROD ? '/utility-tools/' : 'http://localhost:5174/';
     }
 
