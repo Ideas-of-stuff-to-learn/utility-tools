@@ -28,6 +28,10 @@ from middleware.user_middleware import (
     assign_user_role, set_user_permission_override,
     get_user_level, delete_user, update_user_credentials,
 )
+from routes.auth import (
+    validate_username, validate_password,
+    username_exists, email_exists, create_user,
+)
 from email_service import send_email
 from permission_weights import compute_role_level
 from backendLocalConfig import ADMIN_LEVEL_OVERRIDE_MIN, ADMIN_AUDIT_MIN_LEVEL
@@ -594,30 +598,56 @@ def admin_set_permission_override(target_user_id):
 @require_admin_auth('users.create')
 @limiter.limit(RL_ADMIN_WRITE)
 def admin_create_user():
-    """Creates a new user account directly, as an elevated action -
-    distinct from the public, self-service /auth/signup (no permission
-    check at all, rate-limited separately). Assigned the plain 'user'
-    role at creation, same as any ordinary signup - use the "assign a
-    role" action afterward if this account should start out elevated.
-    Same validation rules as /auth/signup via the shared
-    validate_username()/validate_password() helpers, so the two paths
-    can never quietly drift into accepting different things."""
+    """Creates a new Cashflow user account directly. Accepts optional
+    `email`, `role` fields in addition to username/password. If `role` is
+    provided it must exist and have a level strictly below the caller's own
+    level (the same ceiling that governs role assignment). If omitted the
+    account is created with the default 'user' role (level 0)."""
     data = request.get_json() or {}
-    username = (data.get('username') or '').strip()
-    password = data.get('password') or ''
+    username  = (data.get('username') or '').strip()
+    password  = data.get('password') or ''
+    email     = (data.get('email') or '').strip() or None
+    role_name = (data.get('role') or '').strip() or None
 
     error = validate_username(username) or validate_password(password)
     if error:
         return jsonify({'error': error}), 400
 
+    if email:
+        from routes.auth import validate_email
+        err = validate_email(email)
+        if err:
+            return jsonify({'error': err}), 400
+
+    current_user = g.admin_user_id
     conn = get_connection()
     try:
+        caller_role, caller_level, _perms = get_admin_role_and_permissions(conn, current_user)
+
+        # Validate role if provided, enforcing level ceiling
+        if role_name:
+            target_role = get_role_by_name(conn, role_name)
+            if not target_role:
+                return jsonify({'error': f'Role "{role_name}" not found'}), 404
+            if target_role['level'] >= caller_level:
+                return jsonify({'error': f'Cannot assign a role at or above your own level ({caller_level})'}), 403
+
         if username_exists(conn, username):
             return jsonify({'error': 'Username already taken'}), 409
+        if email and email_exists(conn, email):
+            return jsonify({'error': 'Email already in use'}), 409
 
         hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=12))
-        new_id = create_user(conn, username, hashed.decode('utf-8'))
+        new_id = create_user(conn, username, hashed.decode('utf-8'), email)
+
+        if role_name:
+            assign_user_role(conn, new_id, role_name)
+
+        conn.commit()
         user = next(u for u in list_all_users(conn) if u['id'] == new_id)
+        _write_audit(conn, current_user, 'users.create', 'user', new_id,
+                     {'username': username, 'role': role_name or 'user'})
+        conn.commit()
         return jsonify({'user': user}), 201
     except Exception as e:
         conn.rollback()

@@ -344,6 +344,22 @@ export async function resetAdminMfa(id) {
     return parseJson(r, 'Failed to reset MFA');
 }
 
+// ── User accounts (regular Cashflow users, level > 0) ─────────────────────────
+
+export async function createUserAccount(username, email, password, role) {
+    const r = await authFetch(`${BASE_URL}/admin/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email: email || undefined, password, role: role || undefined }),
+    });
+    return (await parseJson(r, 'Failed to create user account')).user;
+}
+
+export async function deleteUserAccount(id) {
+    const r = await authFetch(`${BASE_URL}/admin/users/${id}`, { method: 'DELETE' });
+    return parseJson(r, 'Failed to delete user account');
+}
+
 // ── Admin — audit log ─────────────────────────────────────────────────────────
 
 export async function getAuditLog({ action = '', actor = '', limit = 200 } = {}) {
