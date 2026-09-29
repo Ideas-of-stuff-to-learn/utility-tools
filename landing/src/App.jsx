@@ -132,6 +132,8 @@ function AppRoutes() {
       <Route path="/cancel-deletion" element={<CancelDeletionScreen />} />
       <Route path="/profile" element={<RequireAuth><ProfileScreen /></RequireAuth>} />
       <Route path="/" element={<RequireAuth><LandingPage /></RequireAuth>} />
+      {/* Unknown paths (this app is also the site 404 page) go home instead of rendering nothing. */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

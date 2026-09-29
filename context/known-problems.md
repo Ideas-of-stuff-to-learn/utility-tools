@@ -22,6 +22,12 @@ That unmounts `Layout` and the whole screen tree on every breakpoint crossing. I
 **PITFALL (fixed in hotfix): never call `navigate()` from a `useLayoutEffect` that can run on first mount.**
 BrowserRouter attaches its history listener in its own layout effect, which runs after child layout effects. The URL changes but router state doesn't, so the page is white. That was the case on cashflow entry at `/` until a resize re-triggered the redirect. Use `useEffect`, like React Router's `<Navigate>`.
 
+**PITFALL (fixed 2026-09-30): cashflow deep links are served by LANDING.**
+GitHub Pages only uses the site-root `404.html`, which is landing's `index.html`. A per-folder `404.html` is ignored. So a reload, restored tab or bookmark of `/utility-tools/cashflow/dashboard` loaded the landing app with no matching route: a white screen. Landing's `main.jsx` now forwards `/utility-tools/cashflow/<path>` to `/utility-tools/cashflow/?p=<path>` before rendering, and never re-forwards a URL that already has `?p`. Cashflow's `normalizeEntryUrl()` (`ResponsiveGate.jsx`, called in `main.jsx`) restores allowlisted paths. It also rewrites the root URL to `/dashboard` or `/home` before BrowserRouter starts, so entry never depends on a post-mount redirect.
+
+**Note: deploys aren't visible for up to ~10 minutes.**
+GitHub Pages sends `Cache-Control: max-age=600` on `index.html`, and landing prefetches `/utility-tools/cashflow/`. Test a deploy with a hard refresh on the cashflow page itself, or after 10 minutes.
+
 **PITFALL (fixed): per-row encrypted IDB cache.**
 One AES-GCM record per transaction, with meta written only after N sequential puts, meant that navigating away mid-write left the cache stale forever. Uploads, recategorisations and deletes never reached IDB at all, and merges never removed deleted rows. Replaced by one encrypted snapshot (`idb/bootSnapshot.js`) re-saved from React state on every change.
 

@@ -1,3 +1,22 @@
+## 2026-09-30 — White screen follow-up: entry URL before router + deep links
+
+The user still saw white after `5197aad`. The live bundle did contain the fix, so that report was most likely the 10-minute Pages cache combined with landing prefetching cashflow.
+
+Hardened anyway:
+- **Cashflow:** `normalizeEntryUrl()` rewrites `/` to `/dashboard` or `/home` before React renders, and restores `?p=` deep links from an allowlist.
+- **Landing:** `main.jsx` forwards `/utility-tools/cashflow/<path>`, which GitHub Pages serves with landing's 404 page, to cashflow as `?p=`. There's a loop guard, plus a `*` catch-all route.
+
+Verified on production builds with the real base paths:
+- Root at desktop → `/dashboard`; root at phone width → `/home`.
+- `?p=/contents` → `/contents`.
+- Hostile `?p` → `/dashboard`.
+- `?p=/charts` at desktop → `/dashboard`.
+- Landing forwards `/cashflow/dashboard` → `/cashflow/?p=%2Fdashboard` with no loop.
+
+Test-harness lesson: `vite preview` needs `--base /utility-tools/cashflow/` because `vite.config` only sets base for `build`. Without it every asset falls back to `index.html`, which looks like a white-screen repro.
+
+---
+
 ## 2026-09-29 — Hotfix: white screen on cashflow entry
 
 `b8de3dc` shipped a ResponsiveGate redirect in `useLayoutEffect`. On first mount that navigate was lost, because BrowserRouter subscribes in its own later layout effect. Entering cashflow at `/` showed a white screen until a resize. Switched to `useEffect`.

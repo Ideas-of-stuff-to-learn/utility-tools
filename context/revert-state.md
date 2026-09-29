@@ -81,3 +81,4 @@ Use `git revert` when changes have already been pushed to origin.
 2026-09-29 | task: fix second-visit spinner oscillation (back-to-tools / reload cycle) | safe-point: bc2446cdfebeb93949d84648b3e28479b87d1495 | status: superseded (did not fix cycle)
 2026-09-29 | task: cashflow boot overhaul — kill StartupScreen/session cycle, faster repeat visits, resize-safe state | safe-point: 6f05b5847951cd076c6e670df5e26ffaa71cfcf5 | status: complete
 2026-09-29 | task: hotfix white screen on cashflow entry (ResponsiveGate redirect lost on first mount) | safe-point: b8de3dca952d7f7295a7976af639cc7d1d6ee499 | status: complete
+2026-09-30 | task: entry URL normalised before router + deep-link restore via landing 404 | safe-point: 5197aad2ac860a82bf4e10ce30a97580a533e6aa | status: complete

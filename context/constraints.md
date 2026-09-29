@@ -88,7 +88,7 @@ The JS threshold is `MOBILE_BREAKPOINT_PX = 1024` (in `src/config/breakpoints.js
 ## Routing
 
 **ResponsiveGate owns the mobile/desktop routing split.**
-`tools/cashflow/WebUI/src/components/ResponsiveGate.jsx` is the single place that decides mobile→/home+/charts vs desktop→/dashboard. Do not add routing logic to other components that duplicates or overrides this. It must always render `<Outlet/>` and redirect from a **passive** `useEffect`. Returning `<Navigate>` renders nothing for one commit and unmounts Layout plus every screen on each breakpoint crossing. A `useLayoutEffect` redirect is worse: BrowserRouter subscribes to history in its own layout effect, which runs after children's on first mount, so the redirect from `/` is lost and the app renders a white screen until something re-triggers it.
+`tools/cashflow/WebUI/src/components/ResponsiveGate.jsx` is the single place that decides mobile→/home+/charts vs desktop→/dashboard. Do not add routing logic to other components that duplicates or overrides this. It must always render `<Outlet/>` and redirect from a **passive** `useEffect`. Returning `<Navigate>` renders nothing for one commit and unmounts Layout plus every screen on each breakpoint crossing. A `useLayoutEffect` redirect is worse: BrowserRouter subscribes to history in its own layout effect, which runs after children's on first mount, so the redirect from `/` is lost and the app renders a white screen until something re-triggers it. Entry URLs (root, and `?p=` deep links handed back by landing's 404 page) are normalised by `normalizeEntryUrl()` in `main.jsx` before React renders. Keep the `KNOWN_PATHS` allowlist there in sync with the routes in `App.jsx`.
 
 ## Session / network (web)
 
