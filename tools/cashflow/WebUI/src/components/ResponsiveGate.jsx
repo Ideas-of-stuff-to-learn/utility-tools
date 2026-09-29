@@ -1,5 +1,5 @@
 // components/ResponsiveGate.jsx
-import { useLayoutEffect } from 'react';
+import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useIsMobile } from '../customHooks/useIsMobile';
 
@@ -22,13 +22,18 @@ function redirectTarget(pathname, isMobile) {
 // and the whole screen tree on every breakpoint crossing. Screen-level state
 // that must survive the Dashboard ↔ Home/Charts swap lives in context
 // (UploadSessionContext, ChartFilterContext).
+//
+// Must be a passive effect, like React Router's own <Navigate>: BrowserRouter
+// subscribes to history in ITS layout effect, which on first mount runs after
+// this child's layout effects — a navigate from a layout effect here changed
+// the URL without the router noticing, leaving "/" rendered as a white screen.
 export default function ResponsiveGate() {
     const isMobile = useIsMobile();
     const { pathname } = useLocation();
     const navigate = useNavigate();
     const target = redirectTarget(pathname, isMobile);
 
-    useLayoutEffect(() => {
+    useEffect(() => {
         if (target) navigate(target, { replace: true });
     }, [target, navigate]);
 

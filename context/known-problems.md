@@ -19,6 +19,9 @@ So refresh after the 24h access expiry always failed, forcing a daily logout. `G
 **PITFALL (fixed): `ResponsiveGate` returning `<Navigate>` renders nothing for one commit.**
 That unmounts `Layout` and the whole screen tree on every breakpoint crossing. It now always renders `<Outlet/>` and redirects from a layout effect. Screen state that must survive the Dashboard ↔ Home/Charts swap lives in `UploadSessionContext` / `ChartFilterContext`.
 
+**PITFALL (fixed in hotfix): never call `navigate()` from a `useLayoutEffect` that can run on first mount.**
+BrowserRouter attaches its history listener in its own layout effect, which runs after child layout effects. The URL changes but router state doesn't, so the page is white. That was the case on cashflow entry at `/` until a resize re-triggered the redirect. Use `useEffect`, like React Router's `<Navigate>`.
+
 **PITFALL (fixed): per-row encrypted IDB cache.**
 One AES-GCM record per transaction, with meta written only after N sequential puts, meant that navigating away mid-write left the cache stale forever. Uploads, recategorisations and deletes never reached IDB at all, and merges never removed deleted rows. Replaced by one encrypted snapshot (`idb/bootSnapshot.js`) re-saved from React state on every change.
 

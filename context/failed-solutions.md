@@ -22,6 +22,10 @@ The root cause was NOT in TransactionsContext. `UserPreferencesContext` (gated o
 
 **Lesson:** trace the whole request timeline, including every provider's mount effects and the landing app's redirect behaviour, before patching the component where the symptom shows.
 
+**Regression in the fix (b8de3dc):** ResponsiveGate redirected from a `useLayoutEffect`, meant to keep Layout mounted and avoid a one-frame wrong screen.
+**Result:** a white screen on every cashflow entry at `/` until the user resized. On first mount the child layout effect ran before BrowserRouter subscribed to history, so the redirect updated the URL but not router state.
+**Fix:** `useEffect`. The browser probe during verification had shown `/home` with empty body text, and it was misread as a transient. An empty-body probe on first load is a bug signal, not noise.
+
 ## JWT Authentication
 
 **Attempt:** Initial JWT implementation without token revocation.  

@@ -1,3 +1,11 @@
+## 2026-09-29 — Hotfix: white screen on cashflow entry
+
+`b8de3dc` shipped a ResponsiveGate redirect in `useLayoutEffect`. On first mount that navigate was lost, because BrowserRouter subscribes in its own later layout effect. Entering cashflow at `/` showed a white screen until a resize. Switched to `useEffect`.
+
+Verified: fresh loads of `/` at desktop and at phone width render `/dashboard` and `/home` respectively. A live resize crossing couldn't be re-tested because the Browser pane was hidden, so confirm it on the deploy.
+
+---
+
 ## 2026-09-29 — Cashflow boot overhaul (COMPLETE, shipped to main)
 
 **Safe-point:** `6f05b58`. Ships frontend (cashflow + landing, GitHub Pages) and backend (Render).
