@@ -11,7 +11,7 @@ import '../styles/homePage.css'
 import '../styles/shared.css'
 
 export default function HomeScreen() {
-    const { transactions, initialLoadError, retryInitialLoad, allTransactionsLoaded, uploadBreakdown, refetchUploadBreakdown } = useTransactions();
+    const { transactions, allTransactionsLoaded, uploadBreakdown, refetchUploadBreakdown } = useTransactions();
     const { categorising, manualReviewFlow } = useProcessing();
     const { dateRangeInfo, refetchUploadCount } = useInitialLoadLogic();
     const { handleLogout } = useLogout();
@@ -35,15 +35,6 @@ export default function HomeScreen() {
         <div className="scroll-view">
             <div className="scroll-content">
                 <HomepageInfo dateRangeInfo={dateRangeInfo} uploadBreakdown={uploadBreakdown} />
-
-                {initialLoadError && (
-                    <div className="banner">
-                        <p className="banner-text">{initialLoadError}</p>
-                        <button className="btn" style={{ marginTop: 8 }} onClick={retryInitialLoad}>
-                            Retry
-                        </button>
-                    </div>
-                )}
 
                 <ActionButtons
                     pickFiles={pickFiles}

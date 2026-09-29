@@ -17,14 +17,16 @@ export default function YearlyChartSection({
 
     if (!ready) return null;
 
-    if (isLoading) return <LoadingBarsPlaceholder message="Preparing your charts..." />;
+    // Show nothing while initial data load is in progress to avoid spinner→chart flash.
+    // Show the placeholder only for active processing states or when load is done and empty.
+    if (isLoading) {
+        const { categorising: cat, processingStage: ps } = { categorising, processingStage };
+        const isProcessing = cat || ps === 'parsing' || ps === 'checkingCache' || ps === 'waitingForLLM';
+        return isProcessing ? <LoadingBarsPlaceholder message="Processing your transactions..." /> : null;
+    }
 
     if (!hasData) {
-        return (
-            <LoadingBarsPlaceholder
-                message={isLoading ? 'Preparing your charts...' : 'No categorised transactions yet — upload a CSV to see charts.'}
-            />
-        );
+        return <LoadingBarsPlaceholder message="No categorised transactions yet — upload a CSV to see charts." />;
     }
 
     function displayWithSeperators(number) {

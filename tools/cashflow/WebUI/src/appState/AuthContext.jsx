@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { getMe } from '../api';
+import { primeGetMe } from '../api';
 
 const AuthContext = createContext();
 
@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         let cancelled = false;
-        getMe()
+        primeGetMe()
             .then(data => {
                 if (cancelled) return;
                 setUserRole(data);

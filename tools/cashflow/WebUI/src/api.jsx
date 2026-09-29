@@ -374,6 +374,15 @@ export async function getMe() {
     if (data.idb_key && data.id) await _setIdbKey(data.idb_key, data.id);
     return data;
 }
+
+// Fire /auth/me before React renders so the promise is in-flight by the
+// time AuthContext's useEffect runs. AuthContext calls this instead of
+// getMe() directly; the cached promise is reused, not a duplicate request.
+let _getMePromise = null;
+export function primeGetMe() {
+    if (!_getMePromise) _getMePromise = getMe().finally(() => { _getMePromise = null; });
+    return _getMePromise;
+}
 // Actually revokes the current session server-side now (see
 // handoff5.txt/handoff6.txt for why the OLD logout() - which only ever
 // cleared local SecureStore - was never enough on its own). Sends the

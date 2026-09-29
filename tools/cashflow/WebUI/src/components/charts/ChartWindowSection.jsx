@@ -53,11 +53,17 @@ export default function ChartWindowSection({
 
     // Early return AFTER all hooks
     if (!ready) {
-        return (
-            <LoadingBarsPlaceholder
-                message={isLoading ? 'Fetching your data...' : 'No categorised transactions yet — upload a CSV to see charts.'}
-            />
-        );
+        // While data is still arriving from IDB or server: show nothing (blank) to
+        // avoid the jarring spinner→chart switch. Only show the placeholder if the
+        // load is fully done and there genuinely is no data (empty account), or if
+        // active file-processing is in progress and we want progress feedback.
+        const isProcessing = categorising
+            || processingStage === 'parsing'
+            || processingStage === 'checkingCache'
+            || processingStage === 'waitingForLLM';
+        if (isProcessing) return <LoadingBarsPlaceholder message="Processing your transactions..." />;
+        if (isLoading) return null;
+        return <LoadingBarsPlaceholder message="No categorised transactions yet — upload a CSV to see charts." />;
     }
 
     const canGoBack = mode === 'year' ? canScrollYearBack : canScrollMonthBack;

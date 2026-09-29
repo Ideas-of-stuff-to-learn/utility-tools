@@ -14,7 +14,7 @@ import ActionButtons from '../components/homepage/ActionButtons';
 import '../styles/dashboardStyles.css';
 
 export default function DashboardScreen() {
-    const { transactions, initialLoadError, retryInitialLoad, allTransactionsLoaded, categoryColors, uploadBreakdown, refetchUploadBreakdown } = useTransactions();
+    const { transactions, allTransactionsLoaded, categoryColors, uploadBreakdown, refetchUploadBreakdown } = useTransactions();
     const { categorising, manualReviewFlow } = useProcessing();
     const { contentsSelectedCategories, toggleContentsCategory, toggleAllContentsCategories } = useChartFilter();
     const { dateRangeInfo, refetchUploadCount } = useInitialLoadLogic();
@@ -74,12 +74,6 @@ export default function DashboardScreen() {
         <div className="dashboard-flex">
             <div className="dashboard-home-box">
                 <HomepageInfo dateRangeInfo={dateRangeInfo} uploadBreakdown={uploadBreakdown} showTitle={false} />
-                {initialLoadError && (
-                    <div className="banner">
-                        <p className="banner-text">{initialLoadError}</p>
-                        <button className="btn" onClick={retryInitialLoad}>Retry</button>
-                    </div>
-                )}
                 <ActionButtons
                     pickFiles={pickFiles}
                     selectedFiles={selectedFiles}
