@@ -78,4 +78,5 @@ Use `git revert` when changes have already been pushed to origin.
 2026-09-28 | task: fix oscillation — idbReady re-run flashes spinner + auth/me 500 + AESGCM keyword arg | safe-point: fa5417b69fd6bcbea7f7805a5f89dc3d68d373a6 | status: complete
 2026-09-29 | task: admin panel — user-level accounts tab in AdminAccountsScreen | safe-point: 0836b6e3b56da99bdf0f67814eefd1afbe4d4c4f | status: complete
 2026-09-29 | task: split admin/user accounts into separate sidebar screens | safe-point: d82ff1e88ead814efe741734d1baa713f1c8e0a2 | status: complete
-2026-09-29 | task: fix second-visit spinner oscillation (back-to-tools / reload cycle) | safe-point: bc2446cdfebeb93949d84648b3e28479b87d1495 | status: in-progress
+2026-09-29 | task: fix second-visit spinner oscillation (back-to-tools / reload cycle) | safe-point: bc2446cdfebeb93949d84648b3e28479b87d1495 | status: superseded (did not fix cycle)
+2026-09-29 | task: cashflow boot overhaul — kill StartupScreen/session cycle, faster repeat visits, resize-safe state | safe-point: 6f05b5847951cd076c6e670df5e26ffaa71cfcf5 | status: complete

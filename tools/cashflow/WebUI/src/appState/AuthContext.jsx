@@ -1,78 +1,104 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { primeGetMe } from '../api';
+import { bootstrapSession, isAuthFailure } from '../api';
 
 const AuthContext = createContext();
 
-const HINT_KEY = 'auth_hint';
-function readHint() { try { return sessionStorage.getItem(HINT_KEY) === '1'; } catch { return false; } }
-function setHint() { try { sessionStorage.setItem(HINT_KEY, '1'); } catch {} }
-function clearHint() { try { sessionStorage.removeItem(HINT_KEY); } catch {} }
+// Landing shares this sessionStorage key (same origin); cashflow only
+// clears it so landing doesn't briefly render a dead session as live.
+function clearLandingHint() { try { sessionStorage.removeItem('auth_hint'); } catch {} }
 
+const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 15000];
+const SLOW_AFTER_MS = 6000;
+
+function isDefinitiveAuthFailure(err) {
+    return isAuthFailure(err) || err?.status === 401 || err?.status === 403 || err?.status === 422;
+}
+
+// status: 'checking' → 'authenticated' | 'unauthenticated'.
+// Only a rejected session moves to 'unauthenticated'. 429 / 5xx / timeouts /
+// offline keep retrying in the background with the app shell on screen —
+// treating those as a logout is what used to bounce users through the
+// landing login page and back.
 export function AuthProvider({ children }) {
-    const hasHint = readHint();
-
-    const [isLoggedIn, setIsLoggedIn] = useState(hasHint);
-    const [isChecking, setIsChecking] = useState(!hasHint);
+    const [status, setStatus] = useState('checking');
     const [userRole, setUserRole] = useState(null);
-    // idbReady: true once getMe() has resolved AND _setIdbKey has run.
-    // Use this (not isLoggedIn) to gate IDB reads — isLoggedIn can be
-    // true from the sessionStorage hint before the crypto key is set.
+    // idbReady: getMe() resolved AND the IDB crypto key is imported.
     const [idbReady, setIdbReady] = useState(false);
+    const [connectionSlow, setConnectionSlow] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
-        primeGetMe()
-            .then(data => {
-                if (cancelled) return;
-                setUserRole(data);
-                setIsLoggedIn(true);
-                setHint();
-                // getMe() calls _setIdbKey internally before returning,
-                // so by the time we reach here the crypto key is set.
-                setIdbReady(true);
-            })
-            .catch(() => {
-                if (cancelled) return;
-                setIsLoggedIn(false);
-                setIdbReady(false);
-                clearHint();
-            })
-            .finally(() => {
-                if (!cancelled) setIsChecking(false);
-            });
-        return () => { cancelled = true; };
+        let retryTimer = null;
+        let attempt = 0;
+        const slowTimer = setTimeout(() => { if (!cancelled) setConnectionSlow(true); }, SLOW_AFTER_MS);
+
+        function run() {
+            clearTimeout(retryTimer);
+            retryTimer = null;
+            bootstrapSession()
+                .then(data => {
+                    if (cancelled) return;
+                    clearTimeout(slowTimer);
+                    setUserRole(data);
+                    setStatus('authenticated');
+                    setIdbReady(true);
+                    setConnectionSlow(false);
+                })
+                .catch(err => {
+                    if (cancelled) return;
+                    if (isDefinitiveAuthFailure(err)) {
+                        clearTimeout(slowTimer);
+                        clearLandingHint();
+                        setStatus('unauthenticated');
+                        return;
+                    }
+                    const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
+                    attempt++;
+                    retryTimer = setTimeout(run, delay);
+                });
+        }
+
+        function retryNow() { if (retryTimer) run(); }
+
+        run();
+        window.addEventListener('online', retryNow);
+        return () => {
+            cancelled = true;
+            clearTimeout(retryTimer);
+            clearTimeout(slowTimer);
+            window.removeEventListener('online', retryNow);
+        };
     }, []);
 
     // Called by LoginScreen/SignupScreen after a successful login response.
-    // The login API call sets the IDB crypto key before returning, so by
-    // the time completeLogin is invoked the key is already in place.
+    // The login API call sets the IDB crypto key before returning.
     const completeLogin = useCallback((role) => {
         setUserRole(role ?? null);
-        setIsLoggedIn(true);
+        setStatus('authenticated');
         setIdbReady(true);
-        setHint();
     }, []);
 
     const endSession = useCallback(() => {
-        setIsLoggedIn(false);
+        setStatus('unauthenticated');
         setIdbReady(false);
         setUserRole(null);
-        clearHint();
+        clearLandingHint();
     }, []);
 
     useEffect(() => {
-        function handleExpired() {
-            setIsLoggedIn(false);
-            setIdbReady(false);
-            setUserRole(null);
-            clearHint();
-        }
-        window.addEventListener('auth:session-expired', handleExpired);
-        return () => window.removeEventListener('auth:session-expired', handleExpired);
-    }, []);
+        window.addEventListener('auth:session-expired', endSession);
+        return () => window.removeEventListener('auth:session-expired', endSession);
+    }, [endSession]);
 
     return (
-        <AuthContext.Provider value={{ isLoggedIn, isChecking, userRole, endSession, idbReady, completeLogin }}>
+        <AuthContext.Provider value={{
+            status,
+            isLoggedIn: status === 'authenticated',
+            isChecking: status === 'checking',
+            connectionSlow,
+            userRole, idbReady,
+            completeLogin, endSession,
+        }}>
             {children}
         </AuthContext.Provider>
     );

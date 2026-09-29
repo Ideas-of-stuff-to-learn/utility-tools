@@ -1,12 +1,10 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { AppStateProvider } from './appState';
-import { useAuth } from './appState';
 import RequireAuth from './components/RequiresAuth';
 import ResponsiveGate from './components/ResponsiveGate';
 import Layout from './components/Layout';
 import ManualReviewGate from './components/manualReview/ManualReviewGate';
-import StartupScreen from './components/StartupScreen';
 
 import HomeScreen from './screens/HomeScreen';
 import DashboardScreen from './screens/Dashboard';
@@ -21,10 +19,6 @@ const ChartsScreen = lazy(() => import('./screens/ChartsScreen'));
 const ContentsScreen = lazy(() => import('./screens/ContentsScreen'));
 
 function AppContent() {
-  const { isChecking } = useAuth();
-
-  if (isChecking) return <StartupScreen />;
-
   return (
     <BrowserRouter basename={import.meta.env.PROD ? '/utility-tools/cashflow' : '/'}>
       <Routes>

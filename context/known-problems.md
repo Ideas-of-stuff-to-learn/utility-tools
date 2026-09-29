@@ -3,6 +3,46 @@
 
 Issues that are documented but not yet fixed. Useful before starting work in an area.
 
+## Web boot / session / IDB pitfalls (2026-09-29)
+
+Read before touching `tools/cashflow/WebUI/src/api.jsx`, `appState/*`, `idb/*`, `ResponsiveGate`, or `landing/src/api.js`.
+
+**PITFALL (fixed, do not reintroduce): any server call before `/auth/me` resolves ends the session.**
+The HMAC secret and CSRF tokens live in JS memory only, so a hard page load has none. A non-`/auth/` request sent before `/auth/me` returns is rejected by the HMAC `before_request` hook (401). That triggered refresh with CSRF `"null"`, which fails, fires `auth:session-expired`, and makes cashflow redirect to landing `/login`. Landing sees valid cookies and forwards straight back: the "spinner → chart → spinner / server waking up" cycle. `authorizedFetch` now awaits `bootstrapSession()` for every path except `/auth/me`. Never add a fetch that bypasses `authorizedFetch`, and gate IDB/server hydration on `idbReady`, never on a hint.
+
+**PITFALL (fixed): 429 / 5xx / timeouts were treated as logout.**
+`AuthContext` used to clear the session on any `getMe` failure. That included Render deploy restarts, the 100/day `/auth/me` rate limit (per IP, in-memory, per worker) and HTML 429 bodies. Now only `isAuthFailure` / 401 / 403 / 422 mean "unauthenticated"; everything else retries with backoff. A JSON 429 handler exists in `extensions.py`.
+
+**PITFALL (fixed): `csrfRefreshToken` is null after every hard load.**
+So refresh after the 24h access expiry always failed, forcing a daily logout. `GET /auth/csrf` (refresh-JWT, GET so CSRF-exempt, CORS-protected) now recovers it.
+
+**PITFALL (fixed): `ResponsiveGate` returning `<Navigate>` renders nothing for one commit.**
+That unmounts `Layout` and the whole screen tree on every breakpoint crossing. It now always renders `<Outlet/>` and redirects from a layout effect. Screen state that must survive the Dashboard ↔ Home/Charts swap lives in `UploadSessionContext` / `ChartFilterContext`.
+
+**PITFALL (fixed): per-row encrypted IDB cache.**
+One AES-GCM record per transaction, with meta written only after N sequential puts, meant that navigating away mid-write left the cache stale forever. Uploads, recategorisations and deletes never reached IDB at all, and merges never removed deleted rows. Replaced by one encrypted snapshot (`idb/bootSnapshot.js`) re-saved from React state on every change.
+
+**Open: every GitHub Pages site under `ideas-of-stuff-to-learn.github.io` shares cashflow's origin.**
+Any other repo published there can call `/auth/me` with the user's cookies (CORS allows the origin) and read the DEK, CSRF and HMAC secrets, and it can read cashflow's IndexedDB/localStorage. A custom domain for the tools would close this.
+
+**Open: `beaconResolveRemainingToOther()` (api.jsx) uses `sendBeacon`.**
+It can't send HMAC/CSRF headers, so it always 401s.
+
+**Open: the `write_queue` IDB store's rows are never deleted.**
+Its only producer (`optimisticUpdateTransactions`) was dead code and has been removed, so nothing enqueues any more. `writeQueue.js` is still initialised by `api.jsx`.
+
+**Open: `release_connection()` returns connections without rollback.**
+Connections go back to the pool "idle in transaction". `SimpleConnectionPool` is also not thread-safe under threaded gunicorn workers.
+
+**Open: rate-limit counters are `memory://` per process.**
+They reset on every deploy and differ per gunicorn worker.
+
+**Open: `tools/cashflow/WebUI/src/components/StartupScreen.jsx` is now unused.**
+Cashflow never shows a full-page startup screen. Safe to delete (not deleted: it predates the session that orphaned it).
+
+**Open: the Render backend sleeps after ~15 min idle.**
+The GitHub keep-alive workflow only pings Supabase. A cold backend now shows "Still connecting…" inside the chart area instead of a full-page screen.
+
 ## Cross-cutting
 
 **No automated tests anywhere.**

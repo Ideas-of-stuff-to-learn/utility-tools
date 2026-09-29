@@ -123,6 +123,16 @@ async function fetchWithTimeout(url, options, timeoutMs = DEFAULT_REQUEST_TIMEOU
 // actually went wrong. This reads the body as text first, tries to
 // parse it, and if that fails, throws a clear message describing what
 // actually happened instead.
+// 429 and 5xx mean "try again later", never "you are logged out". Callers
+// (AuthContext, writeQueue) branch on .isTransient / .status.
+function _httpError(message, status, code) {
+    const err = new Error(message);
+    err.status = status;
+    if (code) err.code = code;
+    err.isTransient = status === 429 || status >= 500;
+    return err;
+}
+
 async function parseJsonResponse(response, fallbackMessage) {
     const text = await response.text();
     let data;
@@ -130,9 +140,9 @@ async function parseJsonResponse(response, fallbackMessage) {
         data = JSON.parse(text);
     } catch (e) {
         if (response.status === 502 || response.status === 503) {
-            throw new Error('The server is starting up or temporarily unavailable - please try again in a few seconds.');
+            throw _httpError('The server is starting up or temporarily unavailable - please try again in a few seconds.', response.status);
         }
-        throw new Error(`Unexpected server response (status ${response.status}) - please try again.`);
+        throw _httpError(`Unexpected server response (status ${response.status}) - please try again.`, response.status);
     }
     // flask_jwt_extended's OWN error responses (expired/invalid/revoked
     // token, missing fresh token) use a `msg` field, not `error` -
@@ -141,8 +151,19 @@ async function parseJsonResponse(response, fallbackMessage) {
     // the JWT layer itself ("Token has been revoked", "Fresh token
     // required", etc.) surfaces its own real reason instead of the
     // generic fallback message every caller passes in.
-    if (!response.ok) throw new Error(data.error || data.msg || fallbackMessage);
+    if (!response.ok) throw _httpError(data.error || data.msg || fallbackMessage, response.status, data.code);
     return data;
+}
+
+function _authFailure() {
+    const err = new Error('Not logged in');
+    err.status = 401;
+    err.isAuthFailure = true;
+    return err;
+}
+
+export function isAuthFailure(err) {
+    return !!err?.isAuthFailure;
 }
 
 
@@ -162,78 +183,139 @@ async function parseJsonResponse(response, fallbackMessage) {
 // authorizedFetch can tell "genuinely logged out" apart from "server
 // was briefly unreachable" and give an accurate, retry-worthy error
 // for the latter instead.
+// Bumped whenever a refresh swaps the access cookie (and with it the jti
+// the HMAC secret is derived from). A request that 401s after the
+// generation moved on was signed with the old secret — it just needs a
+// re-sign, not another refresh. Refreshing again would rotate the cookie
+// under every other in-flight request and cascade.
+let tokenGeneration = 0;
 let refreshPromise = null;
 
+// csrfRefreshToken lives in memory only, so it is gone after every hard
+// page load. GET is exempt from CSRF, so the backend can hand it back
+// for the refresh cookie the browser already holds; CORS keeps the
+// response unreadable to any other origin.
+async function _recoverRefreshCsrf() {
+    try {
+        const response = await fetchWithTimeout(`${BASE_URL}/auth/csrf`, {
+            method: 'GET',
+            credentials: 'include',
+        }, COLD_START_TIMEOUT_MS);
+        if (!response.ok) return response.status;
+        const data = await response.json();
+        if (data.csrf_refresh_token) csrfRefreshToken = data.csrf_refresh_token;
+        return 200;
+    } catch {
+        return 0;
+    }
+}
+
+// Resolves true (refreshed), false (refresh token genuinely rejected →
+// session is dead), or throws an .isTransient error (network, 429, 5xx —
+// the session is probably fine, the server just couldn't answer).
 async function tryRefreshAccessToken() {
     if (refreshPromise) return refreshPromise;
 
     refreshPromise = (async () => {
+        if (!csrfRefreshToken) {
+            const status = await _recoverRefreshCsrf();
+            if (status === 401 || status === 422) return _endSession();
+            if (status !== 200 && status !== 404) {
+                throw Object.assign(new Error('Token refresh failed - server unreachable or busy.'), { isTransient: true, status });
+            }
+        }
+
         let response;
         try {
             response = await fetchWithTimeout(`${BASE_URL}/auth/refresh`, {
                 method: 'POST',
                 credentials: 'include',
-                headers: { 'X-CSRF-TOKEN': csrfRefreshToken },
+                headers: csrfRefreshToken ? { 'X-CSRF-TOKEN': csrfRefreshToken } : {},
             }, COLD_START_TIMEOUT_MS);
-        } catch (e) {
-            const transientError = new Error('Token refresh failed - server unreachable or timed out.');
-            transientError.isTransient = true;
-            throw transientError;
-        } finally {
-            refreshPromise = null;
+        } catch {
+            throw Object.assign(new Error('Token refresh failed - server unreachable or timed out.'), { isTransient: true, status: 0 });
         }
 
         if (response.ok) {
             const data = await response.json();
             csrfAccessToken = data.csrf_access_token;
             if (data.hmac_signing_secret) hmacSigningSecret = data.hmac_signing_secret;
-        } else {
-            // Refresh token itself was rejected — session is genuinely dead.
-            // Signal the app to kick the user to the login screen.
-            window.dispatchEvent(new CustomEvent('auth:session-expired'));
+            tokenGeneration++;
+            return true;
         }
-        return response.ok;
-    })();
+        if (response.status === 429 || response.status >= 500) {
+            throw Object.assign(new Error('Token refresh failed - server busy.'), { isTransient: true, status: response.status });
+        }
+        return _endSession();
+    })().finally(() => { refreshPromise = null; });
 
     return refreshPromise;
 }
+
+function _endSession() {
+    window.dispatchEvent(new CustomEvent('auth:session-expired'));
+    return false;
+}
+
+// Every non-/auth/me request waits for the page's session bootstrap, so
+// nothing can race ahead of /auth/me without the HMAC secret and CSRF
+// tokens. That race used to 401 → refresh with a null CSRF token →
+// "session expired" → bounce through the landing login page.
+let _sessionPromise = null;
+
+export function bootstrapSession() {
+    if (!_sessionPromise) {
+        _sessionPromise = getMe().catch(err => {
+            _sessionPromise = null;
+            throw err;
+        });
+    }
+    return _sessionPromise;
+}
+
+async function _awaitSession(path) {
+    if (path === '/auth/me' || !_sessionPromise) return;
+    try { await _sessionPromise; } catch { /* caller's own request will surface the failure */ }
+}
+
+async function _buildHeaders(method, path, extra) {
+    const headers = { ...extra, ...(await computeHmacHeaders(method, path)) };
+    // CSRF is only checked on state-changing methods. Leaving it off GETs
+    // keeps /auth/me a "simple" CORS request — no preflight round trip.
+    if (method !== 'GET' && method !== 'HEAD' && csrfAccessToken) headers['X-CSRF-TOKEN'] = csrfAccessToken;
+    return headers;
+}
+
 // The one place every authenticated call in this file goes through.
 // Attaches the current access token, makes the request, and if the
 // backend answers 401 (expired access token, or revoked via
 // /auth/logout or /admin/tokens/revoke), transparently tries ONE
 // refresh-and-retry before giving up - the silent "stay logged in"
 // behaviour this app relies on instead of asking for a password every
-// 24 hours. Only throws "Not logged in" if that retry also fails,
-// matching the exact message every existing caller already checks for
-// - no call site elsewhere in this file needed to change its own
-// error handling for this.
+// 24 hours. Only throws "Not logged in" when the refresh token itself
+// is rejected; network/429/5xx failures during refresh throw an
+// .isTransient error instead so nobody mistakes them for a logout.
 async function authorizedFetch(url, options = {}, timeoutMs, onTiming, signal) {
-    const method = options.method || 'GET';
+    const method = (options.method || 'GET').toUpperCase();
     const path = new URL(url, 'http://x').pathname;
-    const hmacHeaders = await computeHmacHeaders(method, path);
+    await _awaitSession(path);
+
+    const sentGeneration = tokenGeneration;
     let response = await fetchWithTimeout(url, {
         ...options,
         credentials: 'include',
-        headers: {
-            ...options.headers,
-            'X-CSRF-TOKEN': csrfAccessToken,
-            ...hmacHeaders,
-        },
+        headers: await _buildHeaders(method, path, options.headers),
     }, timeoutMs, onTiming, signal);
 
     if (response.status === 401) {
-        const refreshed = await tryRefreshAccessToken();
-        if (!refreshed) throw new Error('Not logged in');
-
-        const hmacHeaders2 = await computeHmacHeaders(method, path);
+        if (tokenGeneration === sentGeneration) {
+            const refreshed = await tryRefreshAccessToken();
+            if (!refreshed) throw _authFailure();
+        }
         response = await fetchWithTimeout(url, {
             ...options,
             credentials: 'include',
-            headers: {
-                ...options.headers,
-                'X-CSRF-TOKEN': csrfAccessToken,
-                ...hmacHeaders2,
-            },
+            headers: await _buildHeaders(method, path, options.headers),
         }, timeoutMs, onTiming, signal);
     }
     return response;
@@ -375,13 +457,12 @@ export async function getMe() {
     return data;
 }
 
-// Fire /auth/me before React renders so the promise is in-flight by the
-// time AuthContext's useEffect runs. AuthContext calls this instead of
-// getMe() directly; the cached promise is reused, not a duplicate request.
-let _getMePromise = null;
-export function primeGetMe() {
-    if (!_getMePromise) _getMePromise = getMe().finally(() => { _getMePromise = null; });
-    return _getMePromise;
+// Cheap fingerprint of the server-side data this user can see. Compared
+// against the fingerprint stored with the IDB snapshot to decide whether
+// a background refetch is needed at all.
+export async function getSyncState(signal) {
+    const response = await authorizedFetch(`${BASE_URL}/sync/state`, { method: 'GET' }, 20000, undefined, signal);
+    return parseJsonResponse(response, 'Failed to check for changes');
 }
 // Actually revokes the current session server-side now (see
 // handoff5.txt/handoff6.txt for why the OLD logout() - which only ever
@@ -510,15 +591,17 @@ export async function resetPassword(token, password) {
 
 export async function getPreferences() {
     const response = await authorizedFetch(`${BASE_URL}/preferences`, { method: 'GET' });
-    return response.json();
+    return parseJsonResponse(response, 'Failed to fetch preferences');
 }
 
-export async function putPreferences(patch) {
-    await authorizedFetch(`${BASE_URL}/preferences`, {
+export async function putPreferences(patch, { keepalive = false } = {}) {
+    const response = await authorizedFetch(`${BASE_URL}/preferences`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
+        keepalive,
     });
+    return parseJsonResponse(response, 'Failed to save preferences');
 }
 
 export async function categorizeCached(transactions, { timeoutMs, onTiming } = {}) {

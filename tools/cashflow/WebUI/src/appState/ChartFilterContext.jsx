@@ -1,9 +1,6 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { useAuth } from './AuthContext';
+import { createContext, useContext, useState, useCallback, useLayoutEffect, useRef, useMemo } from 'react';
 import { useTransactions } from './TransactionsContext';
 import { NEEDS_MANUAL_REVIEW, NOT_YET_CATEGORISED } from '../checkingName';
-import { getIdbKey, getIdbUserId } from '../api';
-import { get as idbGet, put as idbPut } from '../idb/store';
 
 const ChartFilterContext = createContext();
 
@@ -44,10 +41,12 @@ function computeChartSummary(transactions) {
 }
 
 export function ChartFilterProvider({ children }) {
-    const { isLoggedIn, idbReady } = useAuth();
     const { categoryNames, transactions } = useTransactions();
 
-    const [chartSummary, setChartSummary] = useState({ yearly: [], monthly: [] });
+    // Derived synchronously in the same render the transactions arrive in —
+    // the boot snapshot hands over transactions + categories together, so
+    // the chart's first frame is already the real chart.
+    const chartSummary = useMemo(() => computeChartSummary(transactions), [transactions]);
 
     // chartDataVersion / bumpChartDataVersion kept for call-site compatibility —
     // called from ~10 places after uploads and categorization. Chart now updates
@@ -61,49 +60,12 @@ export function ChartFilterProvider({ children }) {
     const [mobileSelectedCategories, setMobileSelectedCategories] = useState(new Set());
     const seenMobileCategoriesRef = useRef(new Set());
 
-    // ── Phase 1: instant IDB warm-start ────────────────────────────────────
-    // Reads ONE pre-computed chart_summary blob (single decrypt, ~2ms) so
-    // hasData=true before transactions finish loading from IDB.
-    // Gated on idbReady (not isLoggedIn) — isLoggedIn can be true from
-    // the sessionStorage hint before getMe() resolves and sets the crypto
-    // key, which would cause getIdbKey() to return null and bail silently.
-    useEffect(() => {
-        if (!idbReady) return;
-        const cryptoKey = getIdbKey();
-        const userId    = getIdbUserId();
-        if (!cryptoKey || !userId) return;
-
-        idbGet(userId, 'preferences', 'chart_summary', cryptoKey)
-            .then(cached => {
-                if (cached?.yearly?.length > 0) setChartSummary(cached);
-            })
-            .catch(() => {});
-    }, [idbReady]);
-
-    // ── Phase 2: recompute from full transactions ───────────────────────────
-    // Runs once transactions are in state (from IDB or server). Computes fresh
-    // aggregates and writes the result back to IDB so the next phase-1 read
-    // is always current.
-    useEffect(() => {
-        if (!transactions || transactions.length === 0) return;
-        const computed = computeChartSummary(transactions);
-        if (computed.yearly.length === 0) return;
-
-        setChartSummary(computed);
-
-        const cryptoKey = getIdbKey();
-        const userId    = getIdbUserId();
-        if (cryptoKey && userId) {
-            idbPut(userId, 'preferences', 'chart_summary', computed, cryptoKey).catch(() => {});
-        }
-    }, [transactions]);
-
-    // ── Reset on logout ─────────────────────────────────────────────────────
-    useEffect(() => {
-        if (!isLoggedIn) {
-            setChartSummary({ yearly: [], monthly: [] });
-        }
-    }, [isLoggedIn]);
+    // Chart view state lives here (not in the chart components) so it
+    // survives Dashboard ↔ Charts remounts when the viewport crosses the
+    // mobile breakpoint. null window start = "follow the latest data".
+    const [chartMode, setChartMode] = useState('month');
+    const [monthWindowStartOverride, setMonthWindowStartOverride] = useState(null);
+    const [yearWindowStartOverride, setYearWindowStartOverride] = useState(null);
 
     const toggleContentsCategory = useCallback((cat) => {
         setContentsSelectedCategories(prev => {
@@ -133,8 +95,10 @@ export function ChartFilterProvider({ children }) {
         );
     }, []);
 
-    // Auto-select newly arriving category names in contents filter
-    useEffect(() => {
+    // Auto-select newly arriving category names. Layout effects so the
+    // selection lands before paint — otherwise the chart's first frame
+    // draws every segment at zero height.
+    useLayoutEffect(() => {
         const newlyArrived = categoryNames.filter(name => !seenContentsCategoriesRef.current.has(name));
         if (newlyArrived.length > 0) {
             setContentsSelectedCategories(prev => {
@@ -146,8 +110,7 @@ export function ChartFilterProvider({ children }) {
         }
     }, [categoryNames]);
 
-    // Auto-select newly arriving category names in mobile filter
-    useEffect(() => {
+    useLayoutEffect(() => {
         const newlyArrived = categoryNames.filter(name => !seenMobileCategoriesRef.current.has(name));
         if (newlyArrived.length > 0) {
             setMobileSelectedCategories(prev => {
@@ -169,6 +132,9 @@ export function ChartFilterProvider({ children }) {
             mobileSelectedCategories,
             toggleMobileCategory,
             toggleAllMobileCategories,
+            chartMode, setChartMode,
+            monthWindowStartOverride, setMonthWindowStartOverride,
+            yearWindowStartOverride, setYearWindowStartOverride,
         }}>
             {children}
         </ChartFilterContext.Provider>

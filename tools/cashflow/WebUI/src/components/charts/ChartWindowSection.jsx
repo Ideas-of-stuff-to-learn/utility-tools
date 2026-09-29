@@ -8,7 +8,7 @@ import IncomeLegend from './IncomeLegend';
 import RangeWindowSlider from './RangeWindowSlider';
 import { useDataReadiness } from '../../customHooks/charts/useDataReadiness';
 import { useSegmentPopup } from '../../customHooks/charts/useSegmentPopup';
-import { useTransactions, useProcessing } from '../../appState';
+import { useTransactions, useProcessing, useChartFilter, useAuth } from '../../appState';
 import { POPUP_VARIANT, POPUP_STATES } from '../../config/popupChartConfig';
 
 export default function ChartWindowSection({
@@ -24,12 +24,11 @@ export default function ChartWindowSection({
     monthBounds, yearBounds,
     buildStackDataFromEntries,
     incomeForEntries,
-    // IDB restore callbacks — optional, provided by parent screens
-    onRestoreWindow, onRestoreCategories,
-    selectedCategories,
 }) {
     const [heightScale, setHeightScale] = useState(1);
-    const [mode, setMode] = useState('month');
+    // Month/year mode lives in context so it survives resize remounts.
+    const { chartMode: mode, setChartMode: setMode } = useChartFilter();
+    const { connectionSlow } = useAuth();
     const { initialLoading } = useTransactions();
     const { categorising, processingStage } = useProcessing();
     const { isLoading } = useDataReadiness(hasData, { initialLoading, categorising, processingStage });
@@ -53,9 +52,12 @@ export default function ChartWindowSection({
 
     // Early return AFTER all hooks
     if (!ready) {
+        const loadingMessage = connectionSlow
+            ? 'Still connecting — your charts will appear as soon as the server responds…'
+            : 'Loading your charts…';
         return (
             <LoadingBarsPlaceholder
-                message={isLoading ? 'Fetching your data...' : 'No categorised transactions yet — upload a CSV to see charts.'}
+                message={isLoading ? loadingMessage : 'No categorised transactions yet — upload a CSV to see charts.'}
             />
         );
     }
@@ -102,12 +104,6 @@ export default function ChartWindowSection({
                     onSegmentInteract={handleSegmentInteract}
                     onChartMouseLeave={handleChartMouseLeave}
                     onChartBackgroundClick={handleChartBackgroundClick}
-                    mode={mode}
-                    monthWindowStart={monthWindowStart}
-                    yearWindowStart={yearWindowStart}
-                    selectedCategories={selectedCategories}
-                    onRestoreWindow={onRestoreWindow}
-                    onRestoreCategories={onRestoreCategories}
                 />
             </div>
 

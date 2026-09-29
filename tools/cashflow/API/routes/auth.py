@@ -850,6 +850,26 @@ def signup():
         release_connection(conn)
 
 
+@app.route('/auth/csrf', methods=['GET'])
+@jwt_required(refresh=True)
+@limiter.limit(RL_AUTH_REFRESH)
+def auth_csrf():
+    """Returns the CSRF token paired with the caller's refresh cookie.
+
+    The web clients hold CSRF tokens in JS memory only, so after a hard page
+    load they no longer have the one POST /auth/refresh requires — which made
+    every expired access token a forced logout. GET is outside
+    JWT_CSRF_METHODS, and CORS keeps this response unreadable to any origin
+    outside CORS_ORIGINS: a cross-site page can trigger the request but can
+    never read the token. Revoked refresh tokens are rejected by the
+    blocklist loader like on any other jwt_required route.
+    """
+    refresh_cookie = request.cookies.get('refresh_token_cookie')
+    return jsonify({
+        'csrf_refresh_token': get_csrf_token(refresh_cookie) if refresh_cookie else None,
+    }), 200
+
+
 @app.route('/auth/refresh', methods=['POST'])
 @jwt_required(refresh=True)
 @limiter.limit(RL_AUTH_REFRESH)

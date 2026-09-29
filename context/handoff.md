@@ -1,3 +1,42 @@
+## 2026-09-29 — Cashflow boot overhaul (COMPLETE, shipped to main)
+
+**Safe-point:** `6f05b58`. Ships frontend (cashflow + landing, GitHub Pages) and backend (Render).
+
+**What was wrong (the real cause, after 4 failed attempts, see failed-solutions.md):** on return visits the sessionStorage hint let `UserPreferencesContext` fire `GET /preferences` before `/auth/me` returned. That caused:
+1. The HMAC 401.
+2. A refresh with CSRF "null", which failed.
+3. `auth:session-expired`.
+4. A hard redirect to landing `/login`.
+5. Landing auto-forwarding back to cashflow.
+
+The loop burnt the 100/day per-IP `/auth/me` limit, after which every boot failed. Any 429/5xx was also treated as logout.
+
+**What changed:** see current-task.md "Recently Completed" for the file-level list. The key new modules are:
+- `idb/bootSnapshot.js`
+- `idb/persistence.js`
+- `appState/UploadSessionContext.jsx`
+- `routes/sync.py`
+- `GET /auth/csrf` in `routes/auth.py`
+
+**Verified locally:**
+- Builds for cashflow and landing both pass.
+- Backend Flask test-client ghost test, with the DB pool stubbed: 9/9.
+- Browser run against a local fake API (all artifacts deleted after the test):
+  - Cold boot: chart at ~1.25s, 9 requests.
+  - Warm boot: chart ~80ms after `/auth/me` returns, only `/auth/me` on the critical path.
+  - A server data change is detected in the background and only transactions are refetched.
+  - Next visit fetches nothing.
+  - Unreachable backend: shell plus "Still connecting…" bars, no full-page screen, no redirect.
+  - Dead session: one redirect, and a second bounce shows the inline panel.
+  - Breakpoint crossing keeps Layout mounted.
+  - Chart mode survives a remount with zero requests.
+
+**Not verifiable locally:** a real signed-in session against production (that would need real credentials or prod accounts). Watch the deploy.
+
+**Open items:** new "Web boot / session / IDB pitfalls" section in known-problems.md. It covers the shared github.io origin risk, sendBeacon without HMAC, unused `StartupScreen.jsx`, the Render idle sleep, and pool/limiter process-locality.
+
+---
+
 ## Pre-Compact Snapshot — 2026-09-29 21:48
 
 **Git HEAD:** `c4709fa`

@@ -42,7 +42,35 @@ export async function encrypt(cryptoKey, plaintext) {
   const combined = new Uint8Array(12 + ciphertext.byteLength);
   combined.set(iv, 0);
   combined.set(new Uint8Array(ciphertext), 12);
-  return btoa(String.fromCharCode(...combined));
+  return _bytesToBase64(combined);
+}
+
+// Spreading a large Uint8Array into String.fromCharCode overflows the
+// call stack (argument limit), so convert in chunks.
+function _bytesToBase64(bytes) {
+  let binary = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Encrypt a plaintext string to raw bytes (no base64) for large records —
+ * IDB stores ArrayBuffers natively, so there is nothing to encode.
+ * @returns {Promise<{ iv: Uint8Array, data: ArrayBuffer }>}
+ */
+export async function encryptBytes(cryptoKey, plaintext) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, new TextEncoder().encode(plaintext));
+  return { iv, data };
+}
+
+/** @returns {Promise<string>} */
+export async function decryptBytes(cryptoKey, iv, data) {
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, data);
+  return new TextDecoder().decode(plain);
 }
 
 /**

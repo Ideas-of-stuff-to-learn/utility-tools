@@ -1,13 +1,17 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useStackOrder } from './useStackOrder';
 import { useChartWindows } from './useChartWindows';
-import { useTransactions, useProcessing, useChartFilter } from '../../appState';
+import { useTransactions, useChartFilter } from '../../appState';
 import { toggleItem, selectAll } from '../../utils/charts/chartUtils';
 import { buildStackDataFromEntries, buildIncomeDataFromEntries } from '../../utils/charts/buildStackData';
 
-export function useChartData() {
+const NO_SELECTION = new Set();
+
+// selectedCategories comes straight from the caller's filter set in
+// ChartFilterContext (desktop vs mobile) — no local copy, so a remounted
+// chart's first frame already has the right categories visible.
+export function useChartData(selectedCategories = NO_SELECTION) {
     const { categoryNames, categoryColors } = useTransactions();
-    const { processingStage } = useProcessing();
     const { chartSummary } = useChartFilter();
 
     const summary = chartSummary;
@@ -16,7 +20,6 @@ export function useChartData() {
     } = useStackOrder(categoryNames);
 
     const [selectedSegment, setSelectedSegment] = useState(null);
-    const [selectedCategories, setSelectedCategories] = useState(new Set());
 
     const availableCategories = useMemo(
         () => categoryNames.filter(c => c !== 'Income'),
@@ -71,7 +74,7 @@ export function useChartData() {
     return {
         hasData,
         effectiveOrder, isCustomOrder, updateOrder, resetOrder, persist, togglePersist,
-        availableCategories, selectedCategories, setSelectedCategories,
+        availableCategories, selectedCategories,
         toggleItem, selectAll,
         allTimeChartData2,
         selectedSegment,

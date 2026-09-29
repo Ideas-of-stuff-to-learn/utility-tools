@@ -1,6 +1,32 @@
 <!-- last-verified: eb0073b 2026-09-23 -->
 # Cashflow2.0 — Engineering Decisions
 
+## Cashflow boot, caching and resize (2026-09-29)
+
+**Decision:** No full-page startup screen in cashflow.
+The app shell renders immediately while `/auth/me` is in flight. The chart area shows the loading bars ("Loading your charts…", then "Still connecting…" after 6s).
+**Reason:** the full-page spinner and "server waking up" swaps were jarring. Cashflow is only entered post-login from landing, which owns the cold-start UX.
+
+**Decision:** Auth state is `checking | authenticated | unauthenticated`.
+Only a rejected refresh token or a 401/403/422 from `/auth/me` is "unauthenticated". A second login bounce within 20s shows an inline "couldn't confirm your sign-in" panel instead of redirecting.
+**Reason:** transient failures (deploys, rate limits, sleeping Render) were logging users out into a redirect loop.
+
+**Decision:** One AES-GCM encrypted boot snapshot in IDB, holding transactions, categories, upload stats and the server fingerprint.
+The ciphertext is prefetched in parallel with `/auth/me`, keyed by the last user id in localStorage. The id is already visible in the IDB database name, and the DEK is never persisted.
+**Reason:** a single decrypt beats N per-row decrypts. The snapshot is re-saved from React state, so every mutation persists.
+**Alternatives rejected:**
+- Persisting a non-extractable CryptoKey in IDB, or a SharedWorker holding it: breaks the "DEK never at rest" rule, and the github.io origin is shared.
+- Plaintext chart aggregates: same data-at-rest concern.
+
+**Decision:** Staleness via a `GET /sync/state` fingerprint (one SQL statement of md5 hashes), checked in the background on boot, on tab focus and every 5 min.
+It refetches only the parts that changed and swaps them in atomically. The refetch is skipped if a local edit or an upload/review happened mid-fetch.
+**Reason:** a warm visit costs one small request instead of a TTL-driven full re-download.
+**Alternative for later:** a trigger-maintained `users.data_version` column (needs a migration).
+
+**Decision:** Chart view state (month/year mode, window starts) lives in `ChartFilterContext`, and upload/categorise state lives in the new `UploadSessionContext`.
+**Reason:** a breakpoint crossing swaps Dashboard ↔ Home/Charts. State kept in a screen was lost, including the parked manual-review items (so manual review never opened).
+**Trade-off:** chart window/mode/selected-category persistence *across visits* (the old `useChartIdb`) was dropped. The chart opens on the latest data every visit, which is also what makes the first paint final with no jump.
+
 ## Authentication
 
 **Decision:** Web uses httpOnly JWT cookie; RN uses expo-secure-store.  

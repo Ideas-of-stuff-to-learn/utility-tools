@@ -40,6 +40,7 @@ import routes.charts
 import routes.health
 import routes.uploads
 import routes.preferences
+import routes.sync
 
 if __name__ == '__main__':
     debug = os.environ.get('FLASK_ENV') == 'development'

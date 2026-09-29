@@ -84,30 +84,6 @@ export async function put(userId, storeName, key, value, cryptoKey) {
   }
 }
 
-export async function getAll(userId, storeName, cryptoKey) {
-  try {
-    const db = await _openDB(_dbName(userId));
-    const rows = await new Promise((resolve, reject) => {
-      const tx = db.transaction(storeName, 'readonly');
-      const req = tx.objectStore(storeName).getAll();
-      req.onsuccess = () => resolve(req.result ?? []);
-      req.onerror = () => reject(req.error);
-    });
-    const results = [];
-    for (const row of rows) {
-      try {
-        const plaintext = await decrypt(cryptoKey, row.value);
-        results.push({ key: row.key, data: JSON.parse(plaintext) });
-      } catch {
-        // Skip undecryptable rows (wrong key, corruption)
-      }
-    }
-    return results;
-  } catch {
-    return [];
-  }
-}
-
 export async function remove(userId, storeName, key) {
   try {
     const db = await _openDB(_dbName(userId));
@@ -151,24 +127,42 @@ export async function clearAll(userId) {
   }
 }
 
-// ── Metadata (staleness tracking) ─────────────────────────────────────────
+// ── Raw records (caller handles encryption) ───────────────────────────────
 
-export async function getMeta(userId, storeName, cryptoKey) {
-  return get(userId, '_meta', storeName, cryptoKey);
+// Returns the stored record as-is (still encrypted). Needs no key, so it can
+// run in parallel with /auth/me before the DEK has arrived.
+export async function readRecord(userId, storeName, key) {
+  try {
+    const db = await _openDB(_dbName(userId));
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readonly');
+      const req = tx.objectStore(storeName).get(key);
+      req.onsuccess = () => resolve(req.result ?? null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch {
+    return null;
+  }
 }
 
-export async function setMeta(userId, storeName, meta, cryptoKey) {
-  return put(userId, '_meta', storeName, meta, cryptoKey);
-}
-
-/**
- * Returns true if the cached store should be re-fetched from the server.
- * @param {object|null} meta - result of getMeta()
- * @param {{ maxAgeMs?: number, serverVersion?: number }} opts
- */
-export function isStale(meta, { maxAgeMs, serverVersion } = {}) {
-  if (!meta) return true;
-  if (maxAgeMs !== undefined && Date.now() - meta.cached_at > maxAgeMs) return true;
-  if (serverVersion !== undefined && meta.version !== serverVersion) return true;
-  return false;
+// Clears storeName (and any alsoClear stores) and writes one record, all in
+// a single readwrite transaction — the record and its freshness data can
+// never be half-written.
+export async function replaceStoreWithRecord(userId, storeName, key, fields, alsoClear = []) {
+  try {
+    const db = await _openDB(_dbName(userId));
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction([storeName, ...alsoClear], 'readwrite');
+      const os = tx.objectStore(storeName);
+      os.clear();
+      os.put({ key, ...fields });
+      for (const s of alsoClear) tx.objectStore(s).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }

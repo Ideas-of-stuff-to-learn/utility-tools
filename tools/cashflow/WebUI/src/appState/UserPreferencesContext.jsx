@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { url as BASE_URL } from '../../../frontendLocalConfig';
 import { get as idbGet, put as idbPut } from '../idb/store.js';
-import { getIdbKey, getIdbUserId } from '../api';
+import { getIdbKey, getIdbUserId, getPreferences, putPreferences } from '../api';
+import { registerFlusher } from '../idb/persistence';
 
 // ─── IDB preference keys ──────────────────────────────────────────────────
 const IDB_STORE       = 'preferences';
@@ -31,14 +31,12 @@ async function idbWritePref(key, value) {
 // ─── server helpers ────────────────────────────────────────────────────────
 async function serverGet() {
     try {
-        const { getPreferences } = await import('../api');
         return await getPreferences();
     } catch { return null; }
 }
-async function serverPut(patch) {
+async function serverPut(patch, opts) {
     try {
-        const { putPreferences } = await import('../api');
-        await putPreferences(patch);
+        await putPreferences(patch, opts);
     } catch (e) {
         console.warn('[UserPrefs] server sync failed:', e.message);
     }
@@ -48,7 +46,10 @@ async function serverPut(patch) {
 const UserPreferencesContext = createContext(null);
 
 export function UserPreferencesProvider({ children }) {
-    const { isLoggedIn } = useAuth();
+    const { idbReady } = useAuth();
+    // True once the local (IDB) copy has been read — consumers that must act
+    // on saved prefs at boot (manual-review picks) wait for this.
+    const [localPrefsReady, setLocalPrefsReady] = useState(false);
 
     // ── state (null/empty defaults until IDB/server hydrates) ─────────────
     const [columnWidthsDesktop, _setColWidthsDesktop] = useState({});
@@ -56,6 +57,9 @@ export function UserPreferencesProvider({ children }) {
     const [stackOrder,   _setStackOrder]   = useState(null);
     const [stackPersist, _setStackPersist] = useState(false);
     const [mrPicks,      _setMrPicks]      = useState(null);
+    // Custom stack order the user hasn't chosen to remember: session-only,
+    // but kept here so it survives chart remounts.
+    const [sessionStackOrder, setSessionStackOrder] = useState(null);
 
     // ── debounce ref for server sync ───────────────────────────────────────
     const syncTimer    = useRef(null);
@@ -71,21 +75,40 @@ export function UserPreferencesProvider({ children }) {
         }, 2000);
     }
 
-    const flushNow = useCallback(() => {
+    const flushNow = useCallback((opts) => {
         if (syncTimer.current) {
             clearTimeout(syncTimer.current);
             syncTimer.current = null;
         }
         const p = { ...pendingPatch.current };
         pendingPatch.current = {};
-        if (Object.keys(p).length > 0) serverPut(p);
+        if (Object.keys(p).length > 0) return serverPut(p, opts);
+        return Promise.resolve();
     }, []);
 
+    // Hard navigations await this (idb/persistence.flushAll); tab close /
+    // backgrounding falls back to a keepalive request that outlives the page.
+    useEffect(() => registerFlusher(() => flushNow({ keepalive: true })), [flushNow]);
+    useEffect(() => {
+        function onHide() {
+            if (document.visibilityState === 'hidden') flushNow({ keepalive: true });
+        }
+        document.addEventListener('visibilitychange', onHide);
+        window.addEventListener('pagehide', onHide);
+        return () => {
+            document.removeEventListener('visibilitychange', onHide);
+            window.removeEventListener('pagehide', onHide);
+        };
+    }, [flushNow]);
+
     // ── hydrate on login ───────────────────────────────────────────────────
-    // Step 1: read IDB instantly (encrypted cache, in-process async, ~1ms)
+    // Gated on idbReady, never on a hint: until /auth/me has returned, the
+    // HMAC secret and IDB key don't exist, so both steps would fail — and the
+    // server call's 401 used to kick off the refresh → logout → bounce loop.
+    // Step 1: read IDB (encrypted local copy)
     // Step 2: fetch server in background (authoritative, overwrites IDB if different)
     useEffect(() => {
-        if (!isLoggedIn) return;
+        if (!idbReady) return;
         let cancelled = false;
 
         async function hydrate() {
@@ -103,6 +126,7 @@ export function UserPreferencesProvider({ children }) {
             if (so)  _setStackOrder(so);
             if (sp)  _setStackPersist(sp);
             if (mr)  _setMrPicks(mr);
+            setLocalPrefsReady(true);
 
             // Step 2 — server (authoritative)
             const remote = await serverGet();
@@ -131,32 +155,7 @@ export function UserPreferencesProvider({ children }) {
 
         hydrate();
         return () => { cancelled = true; };
-    }, [isLoggedIn]);
-
-    // ── flush to server on page unload ─────────────────────────────────────
-    useEffect(() => {
-        if (!isLoggedIn) return;
-        function handleBeforeUnload() {
-            if (syncTimer.current) {
-                clearTimeout(syncTimer.current);
-                syncTimer.current = null;
-            }
-            const p = { ...pendingPatch.current };
-            pendingPatch.current = {};
-            if (Object.keys(p).length === 0) return;
-            try {
-                fetch(`${BASE_URL}/preferences`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(p),
-                    keepalive: true,
-                    credentials: 'include',
-                });
-            } catch (_) {}
-        }
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [isLoggedIn]);
+    }, [idbReady]);
 
     // ── setters (IDB + state + debounced server) ───────────────────────────
     const setColumnWidthsDesktop = useCallback((widths) => {
@@ -173,7 +172,7 @@ export function UserPreferencesProvider({ children }) {
 
     const setStackOrder = useCallback((order) => {
         _setStackOrder(order);
-        if (order !== null) idbWritePref(K_STACK_ORDER, order);
+        idbWritePref(K_STACK_ORDER, order);
         scheduleSync({ stackOrder: order });
     }, []);
 
@@ -183,9 +182,11 @@ export function UserPreferencesProvider({ children }) {
         scheduleSync({ stackPersist: value });
     }, []);
 
+    // null must be written too: skipping it left already-resolved picks in
+    // IDB, and every later boot re-sent them to the server.
     const setMrPicks = useCallback((picks) => {
         _setMrPicks(picks);
-        if (picks !== null) idbWritePref(K_MR_PICKS, picks);
+        idbWritePref(K_MR_PICKS, picks);
         scheduleSync({ mrPicks: picks });
     }, []);
 
@@ -195,7 +196,9 @@ export function UserPreferencesProvider({ children }) {
             columnWidthsMobile,  setColumnWidthsMobile,
             stackOrder,          setStackOrder,
             stackPersist, setStackPersist,
+            sessionStackOrder, setSessionStackOrder,
             mrPicks,      setMrPicks,
+            localPrefsReady,
             flushNow,
         }}>
             {children}

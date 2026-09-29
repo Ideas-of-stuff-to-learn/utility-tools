@@ -88,7 +88,15 @@ The JS threshold is `MOBILE_BREAKPOINT_PX = 1024` (in `src/config/breakpoints.js
 ## Routing
 
 **ResponsiveGate owns the mobile/desktop routing split.**
-`App/WebUI/src/components/ResponsiveGate.jsx` is the single place that decides mobile→/home+/charts vs desktop→/dashboard. Do not add routing logic to other components that duplicates or overrides this.
+`tools/cashflow/WebUI/src/components/ResponsiveGate.jsx` is the single place that decides mobile→/home+/charts vs desktop→/dashboard. Do not add routing logic to other components that duplicates or overrides this. It must always render `<Outlet/>` and redirect from an effect. Returning `<Navigate>` renders nothing for one commit and unmounts Layout plus every screen on each breakpoint crossing.
+
+## Session / network (web)
+
+**Every authenticated request goes through `authorizedFetch` (api.jsx).**
+It waits for `bootstrapSession()` (`/auth/me`), so nothing is sent without the in-memory HMAC secret and CSRF tokens. No raw `fetch`/`sendBeacon` to authenticated endpoints, and no hydration gated on anything but `idbReady`.
+
+**429 / 5xx / network errors are never a logout.**
+Only a rejected refresh token (`isAuthFailure`) or a 401/403/422 from `/auth/me` may move auth to `unauthenticated`.
 
 ## Mobile
 
@@ -97,8 +105,8 @@ The JS threshold is `MOBILE_BREAKPOINT_PX = 1024` (in `src/config/breakpoints.js
 
 ## State Architecture
 
-**Web AppState is 4 separate contexts, not one.**
-`AuthContext`, `ProcessingContext`, `TransactionsContext`, `ChartFilterContext` — composed via `AppStateProvider` in `appState/index.jsx`. Do not conflate them into a single context.
+**Web AppState is 6 separate contexts, not one.**
+`AuthContext`, `UserPreferencesContext`, `ProcessingContext`, `TransactionsContext`, `ChartFilterContext`, `UploadSessionContext` — composed via `AppStateProvider` in `appState/index.jsx` (nesting order documented there). Do not conflate them into a single context. State that must survive a breakpoint crossing belongs in these, not in screens.
 
 **RN AppState is one combined context.**
 `AppContext.js` with `useApp()` hook. This is intentional and mirrors how earlier RN versions were structured — it has not been split like the web.

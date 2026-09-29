@@ -38,6 +38,7 @@ DISABLE_RL_READ_TRANSACTIONS = False  # GET /transactions
 DISABLE_RL_READ_CATEGORIES   = False  # GET /categories
 DISABLE_RL_READ_CHARTS       = False  # GET /charts/*
 DISABLE_RL_READ_UPLOADS      = False  # GET /uploads/count + /uploads/breakdown
+DISABLE_RL_SYNC_STATE        = False  # GET /sync/state
 
 # Preferences
 DISABLE_RL_PREFERENCES_READ  = False  # GET /preferences
@@ -79,8 +80,12 @@ def _rl(limit_string: str, flag_name: str = ""):
 
 # ── AUTH ─────────────────────────────────────────────────────────────────────
 
-RL_AUTH_ME = _rl("100 per day", "DISABLE_RL_AUTH_ME")
-# GET /auth/me — identity check on load.
+RL_AUTH_ME = _rl("30 per minute; 1500 per day", "DISABLE_RL_AUTH_ME")
+# GET /auth/me — identity check on EVERY page load (cashflow, landing,
+# admin) and the only source of the IDB key. The old flat 100/day per IP
+# was exhausted by ordinary back-and-forth navigation, after which the app
+# could not load at all for the rest of the day. The per-minute cap still
+# stops a runaway loop within seconds.
 # Used in: routes/auth.py
 
 RL_AUTH_LOGIN = _rl("10 per minute", "DISABLE_RL_AUTH_LOGIN")
@@ -129,6 +134,10 @@ RL_READ_CHARTS = _rl("100 per day", "DISABLE_RL_READ_CHARTS")
 
 RL_READ_UPLOADS = _rl("100 per day", "DISABLE_RL_READ_UPLOADS")
 # GET /uploads/count + /uploads/breakdown. Used in: routes/uploads.py, routes/transactions/crud.py
+
+RL_SYNC_STATE = _rl("30 per minute; 2000 per day", "DISABLE_RL_SYNC_STATE")
+# GET /sync/state — cheap change fingerprint the web client polls in the
+# background (boot, tab focus, every 5 min). Used in: routes/sync.py
 
 RL_READ_STANDARD = RL_READ_TRANSACTIONS
 # Backward-compat alias. New routes should use a specific constant.

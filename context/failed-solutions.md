@@ -1,6 +1,27 @@
 <!-- last-verified: eb0073b 2026-09-23 -->
 # Cashflow2.0 — Failed Solutions
 
+## Cashflow return-visit spinner / "server waking up" cycle (2026-09-29)
+
+The root cause was NOT in TransactionsContext. `UserPreferencesContext` (gated on the sessionStorage hint) sent `GET /preferences` before `/auth/me` returned. The HMAC hook 401'd it, the refresh went out with CSRF `"null"`, `auth:session-expired` fired, and the app bounced through landing `/login` and back. The spinner and "waking up" page the user saw were mostly landing's login checking screen. Fixed in the boot overhaul (session gate in `authorizedFetch`).
+
+**Attempt 1 (c4709fa):** gate the TransactionsContext effect on `idbReady`.
+**Why it failed:** it fixed a real double-run but left the pre-`getMe` `/preferences` call, which caused the bounce.
+
+**Attempt 2:** call `endSession()` before the "Back to Tools" hard nav.
+**Why it failed:** `isLoggedIn=false` made RequireAuth fire its own login redirect, and landing forwarded straight back to cashflow instead of staying on the landing page. Reverted.
+
+**Attempt 3 (6f27897):** longer TTLs plus `setMeta` for categories on the per-row IDB cache.
+**Why it failed:** meta was written only after N sequential encrypted puts, and mutations never reached IDB, so repeat visits never got faster. Replaced by the single-record snapshot.
+
+**Attempt 4 (afa10f0):** `primeGetMe()` preflight at module load.
+**Why it failed:** a small latency win, but it did nothing about the pre-`getMe` 401. Superseded by `bootstrapSession()` plus the session gate.
+
+**Attempt 5 (afa10f0, reverted in 6f05b58):** remove `LoadingBarsPlaceholder` from the chart area.
+**Why it failed:** the owner wants the animated bars. Only the full-page StartupScreen and the "waking up" banner/page were unwanted.
+
+**Lesson:** trace the whole request timeline, including every provider's mount effects and the landing app's redirect behaviour, before patching the component where the symptom shows.
+
 ## JWT Authentication
 
 **Attempt:** Initial JWT implementation without token revocation.  

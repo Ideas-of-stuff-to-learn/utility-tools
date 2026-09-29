@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "web",
+      "name": "cashflow",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "App/WebUI"],
+      "runtimeArgs": ["run", "dev", "--prefix", "tools/cashflow/WebUI"],
       "port": 5173,
       "url": "http://localhost:5173"
     }

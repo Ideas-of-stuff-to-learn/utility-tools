@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback, useLayoutEffect } from 'react';
+import { useRef, useEffect, useState, useLayoutEffect } from 'react';
 import YAxisLabelColumn from './YAxisLabelColumn';
 import ChartPopupLayer from './ChartPopupLayer';
 import {
@@ -9,7 +9,6 @@ import {
 } from '../../utils/charts/stackChartGeometry';
 import { transformValue } from '../../utils/charts/chartUtils';
 import { INTERACTION_MODE, INTERACTION_MODES } from '../../config/popupChartConfig';
-import { useChartIdb } from '../../customHooks/charts/useChartIdb';
 import '../../styles/stackedChartStyles.css';
 
 const BAR_WIDTH          = 32;
@@ -37,57 +36,22 @@ function getCSSVars() {
 }
 
 export default function StackChartCanvas({
-    stackData, incomeData, heightScale = 1,
+    stackData: stackDataProp, incomeData, heightScale = 1,
     popupVariant, activeSegment,
     onSegmentInteract, onChartMouseLeave, onChartBackgroundClick,
-    // IDB window/category restore callbacks (wired from ChartWindowSection)
-    onRestoreWindow, onRestoreCategories,
-    // Current mode + window state for IDB persistence
-    mode, monthWindowStart, yearWindowStart, selectedCategories,
 }) {
-    // All hooks must run unconditionally — early return is below them
-    const canvasRef    = useRef(null);
-    const containerRef = useRef(null);
-    const dprRef       = useRef(window.devicePixelRatio || 1);
-    const pendingDraw  = useRef(false);
-    const scrollRef    = useRef(0);  // mirror of scrollOffsetX for use inside callbacks
+    // Every hook runs unconditionally; the empty-data return is at the end.
+    const canvasRef      = useRef(null);
+    const containerRef   = useRef(null);
+    const dprRef         = useRef(window.devicePixelRatio || 1);
+    const pendingDraw    = useRef(false);
+    const scrollRef      = useRef(0);  // mirror of scrollOffsetX for use inside callbacks
+    const touchStartXRef = useRef(0);
+    const drawRef        = useRef(null);
     const [scrollOffsetX, setScrollOffsetX] = useState(0);
 
-    // ── IDB: instant PNG paint + persist render cache ─────────────────────
-    useChartIdb({
-        mode, monthWindowStart, yearWindowStart, selectedCategories,
-        canvasRef, stackData, scrollOffsetX,
-        onRestoreWindow,
-        onRestoreCategories,
-        onRestoreRenderCache: useCallback((cache) => {
-            // Paint cached PNG immediately if viewport width matches
-            if (!cache?.pngBase64 || !canvasRef.current || !containerRef.current) return;
-            const logicalW = containerRef.current.clientWidth;
-            if (Math.abs((cache.viewportWidth || 0) - logicalW) > 8) return;  // size mismatch — skip
-
-            const img = new Image();
-            img.onload = () => {
-                const canvas = canvasRef.current;
-                if (!canvas) return;
-                const d = dprRef.current;
-                const logicalH = LABEL_HEADROOM + TOP_PADDING + BASE_CHART_HEIGHT * heightScale + LABEL_ROW_HEIGHT;
-                if (canvas.width === 0) {
-                    canvas.width  = Math.round(logicalW * d);
-                    canvas.height = Math.round(logicalH * d);
-                    canvas.style.width  = logicalW + 'px';
-                    canvas.style.height = logicalH + 'px';
-                }
-                const ctx = canvas.getContext('2d');
-                ctx.resetTransform();
-                ctx.scale(d, d);
-                ctx.drawImage(img, 0, 0, logicalW, logicalH);
-            };
-            img.src = cache.pngBase64;
-        }, [heightScale]),
-    });
-
-    // Early return AFTER all hooks — hooks must always run in the same order
-    if (!stackData || stackData.length === 0) return null;
+    const stackData = stackDataProp || [];
+    const hasBars = stackData.length > 0;
 
     // Geometry derived from props
     const chartHeight   = BASE_CHART_HEIGHT * heightScale;
@@ -115,7 +79,7 @@ export default function StackChartCanvas({
     function draw(overrideScroll) {
         const canvas    = canvasRef.current;
         const container = containerRef.current;
-        if (!canvas || !container) return;
+        if (!canvas || !container || !hasBars) return;
 
         const scroll   = overrideScroll !== undefined ? overrideScroll : scrollRef.current;
         const logicalW = container.clientWidth;
@@ -238,17 +202,21 @@ export default function StackChartCanvas({
         ctx.restore();
     }
 
-    function scheduleDraw(overrideScroll) {
+    // rAF callbacks and the ResizeObserver outlive the render that scheduled
+    // them; going through this ref means they always draw the latest data.
+    drawRef.current = draw;
+
+    function scheduleDraw() {
         if (pendingDraw.current) return;
         pendingDraw.current = true;
         requestAnimationFrame(() => {
-            draw(overrideScroll);
             pendingDraw.current = false;
+            drawRef.current?.();
         });
     }
 
     // Redraw whenever deps change
-    useEffect(() => { scheduleDraw(); }, [stackData, incomeData, heightScale, activeSegment, scrollOffsetX]);
+    useEffect(() => { scheduleDraw(); }, [stackDataProp, incomeData, heightScale, activeSegment, scrollOffsetX]);
 
     // Scroll to rightmost on stackData change (useLayoutEffect avoids flash)
     useLayoutEffect(() => {
@@ -256,17 +224,19 @@ export default function StackChartCanvas({
         const maxScroll = Math.max(0, totalWidth - containerRef.current.clientWidth);
         scrollRef.current = maxScroll;
         setScrollOffsetX(maxScroll);
-    }, [stackData]);
+    }, [stackDataProp]);
 
-    // ResizeObserver — update DPR and redraw
+    // ResizeObserver — update DPR and redraw. Re-attached when the container
+    // appears (it isn't rendered while there are no bars).
     useEffect(() => {
+        if (!containerRef.current) return;
         const obs = new ResizeObserver(() => {
             dprRef.current = window.devicePixelRatio || 1;
             scheduleDraw();
         });
-        if (containerRef.current) obs.observe(containerRef.current);
+        obs.observe(containerRef.current);
         return () => obs.disconnect();
-    }, []);
+    }, [hasBars]);
 
     // ── Hit testing ──────────────────────────────────────────────────────
     function hitTest(mouseX, mouseY) {
@@ -368,7 +338,6 @@ export default function StackChartCanvas({
     }
 
     // Touch scroll
-    const touchStartXRef = useRef(0);
     function handleTouchStart(e) { touchStartXRef.current = e.touches[0].clientX; }
     function handleTouchMove(e) {
         const dx = touchStartXRef.current - e.touches[0].clientX;
@@ -378,6 +347,8 @@ export default function StackChartCanvas({
         scrollRef.current = next;
         setScrollOffsetX(next);
     }
+
+    if (!hasBars) return null;
 
     return (
         <div className="stack-chart-scroll" onMouseLeave={onChartMouseLeave} style={{ position: 'relative' }}>

@@ -63,78 +63,126 @@ async function parseJsonResponse(response, fallbackMessage) {
         data = JSON.parse(text);
     } catch (e) {
         if (response.status === 502 || response.status === 503) {
-            throw new Error('The server is starting up or temporarily unavailable - please try again in a few seconds.');
+            throw Object.assign(new Error('The server is starting up or temporarily unavailable - please try again in a few seconds.'), { status: response.status, isTransient: true });
         }
-        throw new Error(`Unexpected server response (status ${response.status}) - please try again.`);
+        throw Object.assign(new Error(`Unexpected server response (status ${response.status}) - please try again.`), { status: response.status, isTransient: response.status === 429 || response.status >= 500 });
     }
-    if (!response.ok) throw new Error(data.error || data.msg || fallbackMessage);
+    if (!response.ok) {
+        throw Object.assign(new Error(data.error || data.msg || fallbackMessage), { status: response.status, code: data.code, isTransient: response.status === 429 || response.status >= 500 });
+    }
     return data;
 }
 
+// Mirrors tools/cashflow/WebUI/src/api.jsx — see the comments there.
+let tokenGeneration = 0;
 let refreshPromise = null;
+
+async function _recoverRefreshCsrf() {
+    try {
+        const response = await fetchWithTimeout(`${BASE_URL}/auth/csrf`, { method: 'GET', credentials: 'include' }, COLD_START_TIMEOUT_MS);
+        if (!response.ok) return response.status;
+        const data = await response.json();
+        if (data.csrf_refresh_token) csrfRefreshToken = data.csrf_refresh_token;
+        return 200;
+    } catch {
+        return 0;
+    }
+}
+
+function _endSession() {
+    window.dispatchEvent(new CustomEvent('auth:session-expired'));
+    return false;
+}
 
 async function tryRefreshAccessToken() {
     if (refreshPromise) return refreshPromise;
 
     refreshPromise = (async () => {
+        if (!csrfRefreshToken) {
+            const status = await _recoverRefreshCsrf();
+            if (status === 401 || status === 422) return _endSession();
+            if (status !== 200 && status !== 404) {
+                throw Object.assign(new Error('Token refresh failed - server unreachable or busy.'), { isTransient: true, status });
+            }
+        }
+
         let response;
         try {
             response = await fetchWithTimeout(`${BASE_URL}/auth/refresh`, {
                 method: 'POST',
                 credentials: 'include',
-                headers: { 'X-CSRF-TOKEN': csrfRefreshToken },
+                headers: csrfRefreshToken ? { 'X-CSRF-TOKEN': csrfRefreshToken } : {},
             }, COLD_START_TIMEOUT_MS);
-        } catch (e) {
-            const transientError = new Error('Token refresh failed - server unreachable or timed out.');
-            transientError.isTransient = true;
-            throw transientError;
-        } finally {
-            refreshPromise = null;
+        } catch {
+            throw Object.assign(new Error('Token refresh failed - server unreachable or timed out.'), { isTransient: true, status: 0 });
         }
 
         if (response.ok) {
             const data = await response.json();
             csrfAccessToken = data.csrf_access_token;
             if (data.hmac_signing_secret) hmacSigningSecret = data.hmac_signing_secret;
-        } else {
-            window.dispatchEvent(new CustomEvent('auth:session-expired'));
+            tokenGeneration++;
+            return true;
         }
-        return response.ok;
-    })();
+        if (response.status === 429 || response.status >= 500) {
+            throw Object.assign(new Error('Token refresh failed - server busy.'), { isTransient: true, status: response.status });
+        }
+        return _endSession();
+    })().finally(() => { refreshPromise = null; });
 
     return refreshPromise;
 }
 
+async function _buildHeaders(method, path, extra) {
+    const headers = { ...extra, ...(await computeHmacHeaders(method, path)) };
+    // CSRF only matters on state-changing methods; omitting it on GET keeps
+    // /auth/me a simple CORS request with no preflight.
+    if (method !== 'GET' && method !== 'HEAD' && csrfAccessToken) headers['X-CSRF-TOKEN'] = csrfAccessToken;
+    return headers;
+}
+
 async function authorizedFetch(url, options = {}, timeoutMs, onTiming, signal) {
-    const method = options.method || 'GET';
+    const method = (options.method || 'GET').toUpperCase();
     const path = new URL(url, 'http://x').pathname;
-    const hmacHeaders = await computeHmacHeaders(method, path);
+    const sentGeneration = tokenGeneration;
     let response = await fetchWithTimeout(url, {
         ...options,
         credentials: 'include',
-        headers: {
-            ...options.headers,
-            'X-CSRF-TOKEN': csrfAccessToken,
-            ...hmacHeaders,
-        },
+        headers: await _buildHeaders(method, path, options.headers),
     }, timeoutMs, onTiming, signal);
 
     if (response.status === 401) {
-        const refreshed = await tryRefreshAccessToken();
-        if (!refreshed) throw new Error('Not logged in');
-
-        const hmacHeaders2 = await computeHmacHeaders(method, path);
+        if (tokenGeneration === sentGeneration) {
+            const refreshed = await tryRefreshAccessToken();
+            if (!refreshed) throw Object.assign(new Error('Not logged in'), { status: 401, isAuthFailure: true });
+        }
         response = await fetchWithTimeout(url, {
             ...options,
             credentials: 'include',
-            headers: {
-                ...options.headers,
-                'X-CSRF-TOKEN': csrfAccessToken,
-                ...hmacHeaders2,
-            },
+            headers: await _buildHeaders(method, path, options.headers),
         }, timeoutMs, onTiming, signal);
     }
     return response;
+}
+
+// Only ever navigate to our own pages after login. A raw ?redirect= value
+// was an open redirect — and a javascript: URL would have run script on
+// this origin, which cashflow shares.
+export function safeRedirectTarget(raw) {
+    if (!raw) return null;
+    try {
+        const target = new URL(raw, window.location.origin);
+        if (target.protocol !== 'https:' && target.protocol !== 'http:') return null;
+        if (import.meta.env.PROD) {
+            if (target.origin !== window.location.origin) return null;
+            if (!target.pathname.startsWith('/utility-tools/')) return null;
+        } else if (target.hostname !== 'localhost' && target.origin !== window.location.origin) {
+            return null;
+        }
+        return target.href;
+    } catch {
+        return null;
+    }
 }
 
 export async function login(identifier, password, elapsedMs) {
@@ -150,6 +198,7 @@ export async function login(identifier, password, elapsedMs) {
     csrfAccessToken  = data.csrf_access_token;
     csrfRefreshToken = data.csrf_refresh_token;
     if (data.hmac_signing_secret) hmacSigningSecret = data.hmac_signing_secret;
+    _mePromise = null;
     return data;
 }
 
@@ -167,6 +216,7 @@ export async function signup(username, password, email) {
     csrfAccessToken  = data.csrf_access_token;
     csrfRefreshToken = data.csrf_refresh_token;
     if (data.hmac_signing_secret) hmacSigningSecret = data.hmac_signing_secret;
+    _mePromise = null;
     return data;
 }
 
@@ -182,14 +232,29 @@ export async function logout() {
     csrfAccessToken   = null;
     csrfRefreshToken  = null;
     hmacSigningSecret = null;
+    _mePromise = null;
 }
 
-export async function getMe() {
+async function _fetchMe() {
     const response = await authorizedFetch(`${BASE_URL}/auth/me`, { method: 'GET' });
     const data = await parseJsonResponse(response, 'Failed to fetch account info');
     if (data.csrf_access_token) csrfAccessToken = data.csrf_access_token;
     if (data.csrf_refresh_token) csrfRefreshToken = data.csrf_refresh_token;
     return data;
+}
+
+// AuthContext, the login screen's stored-session check and completeLogin all
+// ask for /auth/me within a second of each other; they share one request.
+// Cleared on login/signup/logout (different identity) and on failure.
+let _mePromise = null;
+export function getMe() {
+    if (!_mePromise) {
+        _mePromise = _fetchMe().catch(err => {
+            _mePromise = null;
+            throw err;
+        });
+    }
+    return _mePromise;
 }
 
 export async function forgotPassword(email, elapsedMs) {

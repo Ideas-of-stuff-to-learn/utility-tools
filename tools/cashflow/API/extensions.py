@@ -21,7 +21,7 @@ import sys
 import psycopg2
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from flask import Flask
+from flask import Flask, jsonify
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_jwt_extended import JWTManager
@@ -45,10 +45,14 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 
+# max_age lets browsers cache preflight results (Chrome caps it at 2h), so
+# repeat visits skip the OPTIONS round trip on every signed request. The
+# origin allowlist is still enforced on every actual response.
 CORS(
     app,
     supports_credentials=True,
     origins=CORS_ORIGINS,
+    max_age=7200,
 )
 
 
@@ -94,25 +98,24 @@ def check_if_token_revoked(jwt_header, jwt_payload):
     ever reads. A signature-valid-but-revoked token is rejected here
     with the same effect as an expired one."""
     jti = jwt_payload["jti"]
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM revoked_tokens WHERE jti = %s", (jti,))
-            result = cur.fetchone() is not None
-        release_connection(conn)
-        return result
-    except psycopg2.OperationalError:
-        # SSL connection went stale after cold start — discard it and retry
-        # once with a fresh connection. This clears the bad connection from
-        # the pool so all subsequent requests in this process also get clean ones.
-        release_connection(conn, discard=True)
+    # Two attempts: an SSL connection that went stale after a cold start
+    # raises OperationalError; it is discarded and the check retried once
+    # on a fresh connection. The finally guarantees every borrowed
+    # connection goes back to the pool — any other exception used to leak
+    # one, and a drained pool 500s every authenticated request.
+    for attempt in range(2):
         conn = get_connection()
+        discard = False
         try:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1 FROM revoked_tokens WHERE jti = %s", (jti,))
                 return cur.fetchone() is not None
+        except psycopg2.OperationalError:
+            discard = True
+            if attempt == 1:
+                raise
         finally:
-            release_connection(conn)
+            release_connection(conn, discard=discard)
 
 
 limiter = Limiter(
@@ -121,6 +124,14 @@ limiter = Limiter(
     default_limits=[],
     storage_uri="memory://",
 )
+
+
+@app.errorhandler(429)
+def rate_limited(_e):
+    """Flask-Limiter's default 429 body is HTML, which clients couldn't tell
+    apart from a crash. JSON with a stable code lets them back off and
+    retry instead of treating it as a logout."""
+    return jsonify({'error': 'Too many requests - please wait a moment and try again.', 'code': 'rate_limited'}), 429
 
 
 @app.after_request

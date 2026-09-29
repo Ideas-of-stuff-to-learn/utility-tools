@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../appState';
+import { goBackToTools } from '../customHooks/homescreen/useLogout';
 import '../styles/ProfilePopup.css';
 
 export default function ProfilePopup({ onClose }) {
@@ -20,7 +21,7 @@ export default function ProfilePopup({ onClose }) {
 
     function handleBackToTools() {
         onClose();
-        window.location.href = import.meta.env.PROD ? '/utility-tools/' : 'http://localhost:5174/';
+        goBackToTools();
     }
 
     function handleEditProfile() {

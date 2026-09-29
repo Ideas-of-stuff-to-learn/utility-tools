@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { signup } from '../api';
+import { signup, safeRedirectTarget } from '../api';
 import { useAuth } from '../AuthContext';
 import '../styles/LoginScreen.css';
 
@@ -35,8 +35,7 @@ export default function SignupScreen() {
             const trimmedEmail = email.trim() || undefined;
             await signup(trimmedUsername, password, trimmedEmail);
             completeLogin(trimmedUsername);
-            const searchParams = new URLSearchParams(window.location.search);
-            const redirect = searchParams.get('redirect');
+            const redirect = safeRedirectTarget(new URLSearchParams(window.location.search).get('redirect'));
             if (redirect) {
                 window.location.href = redirect;
             } else {

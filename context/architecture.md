@@ -196,21 +196,41 @@ Response contains results + any NEEDS_MANUAL_REVIEW items
 ProcessingContext detects NEEDS_MANUAL_REVIEW → triggers manual review gate
 ```
 
+## Web Boot + Data Lifecycle (cashflow, 2026-09-29)
+
+```
+main.jsx (before React renders)
+  ├─ bootstrapSession()      GET /auth/me → HMAC secret, CSRF tokens, DEK (memory only)
+  └─ prefetchBootSnapshot()  IDB read of the still-encrypted snapshot (last uid from localStorage)
+React renders the shell immediately: status='checking', chart area = loading bars (no full-page screen)
+/auth/me resolves → idbReady
+  ├─ TransactionsContext: decrypt ONE snapshot → transactions+categories+upload stats in one render
+  │     (no snapshot = cold start: /sync/state, then /categories + first page (500), then the rest in 2000s)
+  ├─ ChartFilterContext: chartSummary = useMemo(transactions)  → chart's first frame is final
+  └─ UserPreferencesContext: IDB prefs → localPrefsReady → server prefs in background
+Background revalidation (boot, tab focus, every 5 min, skipped while uploading/reviewing):
+  GET /sync/state fingerprints ≠ snapshot's → refetch only changed parts → swap atomically
+Any data change → debounced re-encrypt + save of the snapshot (flushed before "Back to Tools")
+```
+
+Every authenticated request goes through `authorizedFetch`. It waits for the bootstrap, re-signs rather than re-refreshing after a token rotation, and recovers the refresh CSRF via `GET /auth/csrf` after a reload. It reports 429/5xx as transient, never as a logout.
+
 ## Chart Data Flow
 
 ```
-[Web] ChartFilterContext ──► /api/charts ──► chartSummary
+[Web] TransactionsContext.transactions ──► ChartFilterContext (useMemo) ──► chartSummary
 [RN]  AppContext         ──► /api/charts ──► chartSummary
        │
        ▼
 FilterPane: user selects categories, drags to reorder
+  (web: selection sets + chart mode/window live in ChartFilterContext → survive resize remounts)
        │
        ▼
 buildStackData: filters + stacks by effectiveOrder
   (empty selectedCategories → empty chart, not show-all)
        │
        ▼
-SpendingStackedChart (web: recharts, RN: react-native-gifted-charts)
+Web: StackChartCanvas (canvas 2D); RN: react-native-gifted-charts
 ```
 
 ## Admin Flow

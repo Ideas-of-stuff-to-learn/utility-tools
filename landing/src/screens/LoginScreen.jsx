@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { login, getMe } from '../api';
+import { login, getMe, safeRedirectTarget } from '../api';
 import { useAuth } from '../AuthContext';
 import '../styles/LoginScreen.css';
 import StartupScreen from '../components/StartupScreen';
@@ -112,8 +112,7 @@ export default function LoginScreen() {
                 setTimeout(() => {
                     if (cancelled) return;
                     completeLogin(me.username);
-                    const searchParams = new URLSearchParams(window.location.search);
-                    const redirect = searchParams.get('redirect');
+                    const redirect = safeRedirectTarget(new URLSearchParams(window.location.search).get('redirect'));
                     if (redirect) {
                         window.location.href = redirect;
                     } else {
@@ -156,8 +155,7 @@ export default function LoginScreen() {
         try {
             await login(identifier.trim(), password, Date.now() - pageLoadRef.current);
             completeLogin(identifier.trim());
-            const searchParams = new URLSearchParams(window.location.search);
-            const redirect = searchParams.get('redirect');
+            const redirect = safeRedirectTarget(new URLSearchParams(window.location.search).get('redirect'));
             if (redirect) {
                 window.location.href = redirect;
             } else {

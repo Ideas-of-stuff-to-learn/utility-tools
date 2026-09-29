@@ -1,15 +1,47 @@
 <!-- last-verified: a834bca 2026-09-23 -->
 # Cashflow2.0 — Current Task
 
-## Status (2026-09-27)
+## Status (2026-09-29)
 
-No active task. Task 25 (encrypted IndexedDB) complete.
+No active task. Cashflow boot overhaul shipped (see Recently Completed).
 
-**Completed this session:** Task 25 — AES-256-GCM encrypted IndexedDB layer with envelope encryption (KEK in env, DEK in user_idb_keys table), write queue, staleness-based rehydration. Also Task 1 JWT wiring + HMAC login fix.
+**Watch after deploy:** return visits to cashflow (Back to Tools → Cashflow, reloads, new tabs) must never show a full-page spinner or "server waking up". Also check Render's auto-deploy settings, since the Render redeploy for the backend part is what adds `/auth/csrf` and `/sync/state`.
 
-**Next task:** Task 10 (React Native update — last) or Tasks 3+4 (Stripe billing, P1 Critical).
+**Next task:** Tasks 3+4 (Stripe billing, P1 Critical) or Task 10 (React Native update — last).
 
 ## Recently Completed
+
+**Cashflow boot overhaul (2026-09-29):**
+- Root cause of the recurring return-visit cycle: `UserPreferencesContext` sent `GET /preferences` before `/auth/me`. The HMAC 401 led to a refresh with CSRF "null", then session-expired, then a bounce through landing `/login` and back.
+- `api.jsx`:
+  - `bootstrapSession()` plus a session gate in `authorizedFetch`.
+  - Refresh deduped until complete.
+  - Re-sign instead of re-refresh after a token rotation.
+  - Refresh CSRF recovered via the new `GET /auth/csrf`.
+  - 429/5xx are transient.
+  - No `X-CSRF-TOKEN` on GETs, so `/auth/me` needs no preflight.
+- `AuthContext`: `checking | authenticated | unauthenticated`, with retry/backoff and a `connectionSlow` flag. The sessionStorage hint is removed.
+- `App`/`RequiresAuth`: no StartupScreen. The redirect runs in an effect, with a 20s loop breaker that shows an inline panel.
+- IDB:
+  - One encrypted snapshot (`idb/bootSnapshot.js`), prefetched before React renders.
+  - Re-saved from state on every change and flushed before Back to Tools (`idb/persistence.js`).
+  - Background revalidation via the new `GET /sync/state` fingerprint.
+- Resize:
+  - `UploadSessionContext` holds picked files, progress, the upload-summary popup and parked manual review.
+  - Chart mode/window live in `ChartFilterContext`.
+  - `ResponsiveGate` always renders `<Outlet/>`.
+  - The chart CSS breakpoint is 1023px.
+- Chart:
+  - `useChartIdb` (PNG cache) deleted.
+  - `StackChartCanvas` hook order and stale-redraw fixed.
+  - `chartSummary` is a `useMemo`.
+  - Category auto-select runs in a layout effect.
+  - Stack order is reactive to preferences.
+- Backend:
+  - JSON 429 handler, CORS preflight `max_age` 7200.
+  - `/auth/me` limit 30/min + 1500/day.
+  - Revocation-check connection leak fixed.
+- Landing: `?redirect=` allowlist (open-redirect/DOM-XSS fix), shared `/auth/me` promise, refresh parity.
 
 **Task 25 — Encrypted IndexedDB layer (2026-09-27):**
 - Envelope encryption: KEK in `IDB_MASTER_KEY` env var, per-user DEK in `user_idb_keys` table (AES-256-GCM encrypted)

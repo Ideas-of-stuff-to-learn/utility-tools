@@ -1,4 +1,3 @@
-import { useEffect, useCallback } from 'react';
 import { useTransactions, useProcessing, useChartFilter } from '../appState';
 import { useChartData } from '../customHooks/charts/useChartData';
 import { useDetailedChartReveal } from '../customHooks/charts/useDetailedChartReveal';
@@ -10,13 +9,13 @@ import '../styles/chartStyles.css';
 
 export default function ChartsScreen() {
     const { initialLoading, categoryColors } = useTransactions();
-    const { categorising, processingStage } = useProcessing();
+    const { processingStage } = useProcessing();
     const { mobileSelectedCategories, toggleMobileCategory, toggleAllMobileCategories } = useChartFilter();
 
     const {
         hasData,
         effectiveOrder, isCustomOrder, updateOrder, resetOrder, persist, togglePersist,
-        availableCategories, selectedCategories, setSelectedCategories: setChartSelectedCategories,
+        availableCategories,
         monthBounds, yearBounds,
         monthWindow, yearWindowEntries,
         monthWindowStart, yearWindowStart,
@@ -24,32 +23,13 @@ export default function ChartsScreen() {
         canScrollMonthBack, canScrollMonthForward,
         canScrollYearBack, canScrollYearForward,
         setMonthWindowByIndex, setYearWindowByIndex,
-        setMonthWindow, setYearWindowStart,
         monthSliderMaxIndex, monthSliderCurrentIndex,
         yearSliderMaxIndex, yearSliderCurrentIndex,
         monthSliderTrackMax, yearSliderTrackMax,
         buildStackDataFromEntries, incomeForEntries,
-    } = useChartData();
-
-    const handleRestoreWindow = useCallback(({ mode: savedMode, monthWindowStart: mws, yearWindowStart: yws }) => {
-        if (mws) setMonthWindow(mws);
-        if (yws != null) setYearWindowStart(yws);
-    }, [setMonthWindow, setYearWindowStart]);
-
-    const handleRestoreCategories = useCallback((cats) => {
-        setChartSelectedCategories(cats);
-    }, [setChartSelectedCategories]);
+    } = useChartData(mobileSelectedCategories);
 
     const chartReady = useDetailedChartReveal(hasData);
-
-    // NEW - same one-way mirror pattern Dashboard.jsx already uses for
-    // contentsSelectedCategories: whenever the shared mobile filter
-    // state changes, copy it into this hook's own local chart-filter
-    // state, so the chart's rendering reflects it. Never flows the
-    // other direction - the chart itself doesn't write back to context.
-    useEffect(() => {
-        setChartSelectedCategories(new Set(mobileSelectedCategories));
-    }, [mobileSelectedCategories, setChartSelectedCategories]);
 
     return (
         <div className="charts-container">
@@ -102,9 +82,6 @@ export default function ChartsScreen() {
                         incomeForEntries={incomeForEntries}
                         monthBounds={monthBounds}
                         yearBounds={yearBounds}
-                        selectedCategories={selectedCategories}
-                        onRestoreWindow={handleRestoreWindow}
-                        onRestoreCategories={handleRestoreCategories}
                     />
 
                 </div>

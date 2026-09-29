@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useRef } from 'react';
 import { useTransactions, useProcessing, useChartFilter } from '../appState';
 import { useInitialLoadLogic } from '../customHooks/homescreen/useInitialLoadLogic';
 import { useLogout } from '../customHooks/homescreen/useLogout';
@@ -14,29 +14,18 @@ import ActionButtons from '../components/homepage/ActionButtons';
 import '../styles/dashboardStyles.css';
 
 export default function DashboardScreen() {
-    const { transactions, allTransactionsLoaded, categoryColors, uploadBreakdown, refetchUploadBreakdown } = useTransactions();
-    const { categorising, manualReviewFlow } = useProcessing();
+    const { transactions, allTransactionsLoaded, categoryColors, uploadBreakdown } = useTransactions();
+    const { categorising } = useProcessing();
     const { contentsSelectedCategories, toggleContentsCategory, toggleAllContentsCategories } = useChartFilter();
-    const { dateRangeInfo, refetchUploadCount } = useInitialLoadLogic();
+    const { dateRangeInfo } = useInitialLoadLogic();
     const { handleLogout } = useLogout();
-    const { pickFiles, selectedFiles, setSelectedFiles, status, setStatus, error, setError } = useFilePicker();
-    const { processFiles, loading, progress, duplicateNotice, clearDuplicateNotice } = useFileProcessor(setStatus, setError, selectedFiles);
+    const { pickFiles, selectedFiles, status, error } = useFilePicker();
+    const { categoriseSelected, loading, progress, duplicateNotice, clearDuplicateNotice } = useFileProcessor();
     const notYetCategorisedCount = transactions.filter(t => t.category === NOT_YET_CATEGORISED).length;
-
-    useEffect(() => {
-        if (!manualReviewFlow) setSelectedFiles([]);
-    }, [manualReviewFlow, setSelectedFiles]);
-
-    async function handleCategorisePress() {
-        await processFiles();
-        setSelectedFiles([]);
-        refetchUploadCount();
-        refetchUploadBreakdown();
-    }
 
     const {
         hasData, effectiveOrder, updateOrder, resetOrder, persist, togglePersist, isCustomOrder,
-        availableCategories, selectedCategories, setSelectedCategories: setChartSelectedCategories,
+        availableCategories,
         monthBounds, yearBounds,
         monthWindow, yearWindowEntries,
         monthWindowStart, yearWindowStart,
@@ -44,31 +33,17 @@ export default function DashboardScreen() {
         canScrollMonthBack, canScrollMonthForward,
         canScrollYearBack, canScrollYearForward,
         setMonthWindowByIndex, setYearWindowByIndex,
-        setMonthWindow, setYearWindowStart,
         monthSliderMaxIndex, monthSliderCurrentIndex,
         yearSliderMaxIndex, yearSliderCurrentIndex,
         monthSliderTrackMax, yearSliderTrackMax,
-        buildStackDataFromEntries, incomeForEntries, selectedSegment,
-    } = useChartData();
+        buildStackDataFromEntries, incomeForEntries,
+    } = useChartData(contentsSelectedCategories);
 
-    const handleRestoreWindow = useCallback(({ mode: savedMode, monthWindowStart: mws, yearWindowStart: yws }) => {
-        if (mws) setMonthWindow(mws);
-        if (yws != null) setYearWindowStart(yws);
-        // mode is managed by ChartWindowSection state internally — can't restore from here
-    }, [setMonthWindow, setYearWindowStart]);
-
-    const handleRestoreCategories = useCallback((cats) => {
-        setChartSelectedCategories(cats);
-    }, [setChartSelectedCategories]);
     const chartReady = useDetailedChartReveal(hasData);
     const chartAreaRef = useRef(null);
 
     // scrollTop removed — chart area uses overflow:hidden and a windowed
     // view; programmatic scroll was pushing the title off the top edge.
-
-    useEffect(() => {
-        setChartSelectedCategories(new Set(contentsSelectedCategories));
-    }, [contentsSelectedCategories, setChartSelectedCategories]);
 
     return (
         <div className="dashboard-flex">
@@ -82,7 +57,7 @@ export default function DashboardScreen() {
                     status={status}
                     error={error}
                     progress={progress}
-                    handleCategorisePress={handleCategorisePress}
+                    handleCategorisePress={categoriseSelected}
                     notYetCategorisedCount={notYetCategorisedCount}
                     allTransactionsLoaded={allTransactionsLoaded}
                     handleLogout={handleLogout}
@@ -120,9 +95,6 @@ export default function DashboardScreen() {
                             incomeForEntries={incomeForEntries}
                             monthBounds={monthBounds}
                             yearBounds={yearBounds}
-                            selectedCategories={selectedCategories}
-                            onRestoreWindow={handleRestoreWindow}
-                            onRestoreCategories={handleRestoreCategories}
                         />
                     </div>
                 </div>

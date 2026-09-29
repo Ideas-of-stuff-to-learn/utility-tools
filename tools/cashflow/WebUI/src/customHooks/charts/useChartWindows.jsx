@@ -1,14 +1,28 @@
 import { getMonthWindow, getDefaultMonthWindowStart, getMonthDataBounds, addMonths } from '../../utils/charts/monthWindow';
 import { getYearWindow, getDefaultYearWindowStart, getYearDataBounds, syncYearWindowToMonthWindow } from '../../utils/charts/yearWindow';
 import { WINDOW_SIZE_OFFSET } from '../../utils/charts/chartWindowConfig';
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
+import { useChartFilter } from '../../appState';
 
+// Window starts live in ChartFilterContext so they survive screen remounts.
+// Until the user scrolls, the override is null and the window follows the
+// latest data — it used to be frozen at whatever existed on mount, which is
+// nothing when the dashboard renders before data arrives.
 export function useChartWindows(monthly, yearly) {
+    const {
+        monthWindowStartOverride, setMonthWindowStartOverride,
+        yearWindowStartOverride, setYearWindowStartOverride,
+    } = useChartFilter();
+
     const monthBounds = useMemo(() => getMonthDataBounds(monthly), [monthly]);
     const yearBounds = useMemo(() => getYearDataBounds(yearly), [yearly]);
 
-    const [monthWindowStart, setMonthWindowStart] = useState(() => getDefaultMonthWindowStart(monthly));
-    const [yearWindowStart, setYearWindowStart] = useState(() => getDefaultYearWindowStart(yearly));
+    const defaultMonthStart = useMemo(() => getDefaultMonthWindowStart(monthly), [monthly]);
+    const defaultYearStart = useMemo(() => getDefaultYearWindowStart(yearly), [yearly]);
+    const monthWindowStart = monthWindowStartOverride ?? defaultMonthStart;
+    const yearWindowStart = yearWindowStartOverride ?? defaultYearStart;
+    const setMonthWindowStart = setMonthWindowStartOverride;
+    const setYearWindowStart = setYearWindowStartOverride;
 
     const monthWindow = useMemo(() => getMonthWindow(monthly, monthWindowStart.year, monthWindowStart.month), [monthly, monthWindowStart]);
     const yearWindowEntries = useMemo(() => getYearWindow(yearly, yearWindowStart), [yearly, yearWindowStart]);
@@ -51,8 +65,8 @@ export function useChartWindows(monthly, yearly) {
 
         setMonthWindowStart(clamped);
         const newMonthWindow = getMonthWindow(monthly, clamped.year, clamped.month);
-        setYearWindowStart(prev => syncYearWindowToMonthWindow(prev, newMonthWindow));
-    }, [monthly, monthBounds]);
+        setYearWindowStart(prev => syncYearWindowToMonthWindow(prev ?? defaultYearStart, newMonthWindow));
+    }, [monthly, monthBounds, defaultYearStart, setMonthWindowStart, setYearWindowStart]);
 
     const scrollMonthWindow = useCallback((deltaMonths) => {
         setMonthWindow(addMonths(monthWindowStart.year, monthWindowStart.month, deltaMonths));
@@ -73,7 +87,7 @@ export function useChartWindows(monthly, yearly) {
 
     const scrollYearWindow = useCallback((deltaYears) => {
         setYearWindowStart(prev => {
-            let next = prev + deltaYears;
+            let next = (prev ?? defaultYearStart) + deltaYears;
             if (yearBounds) {
                 const earliestStart = yearBounds.earliestYear;
                 let latestStart = yearBounds.latestYear - WINDOW_SIZE_OFFSET;
@@ -83,7 +97,7 @@ export function useChartWindows(monthly, yearly) {
             }
             return next;
         });
-    }, [yearBounds]);
+    }, [yearBounds, defaultYearStart, setYearWindowStart]);
 
     const setYearWindowByIndex = useCallback((index) => {
         if (!yearBounds) return;
@@ -93,7 +107,7 @@ export function useChartWindows(monthly, yearly) {
         if (next < yearBounds.earliestYear) next = yearBounds.earliestYear;
         if (next > latestStart) next = latestStart;
         setYearWindowStart(next);
-    }, [yearBounds]);
+    }, [yearBounds, setYearWindowStart]);
 
     const canScrollMonthBack = monthWindowBoundsStart
         ? (monthWindowStart.year * 100 + monthWindowStart.month) > (monthWindowBoundsStart.earliestStart.year * 100 + monthWindowBoundsStart.earliestStart.month)
