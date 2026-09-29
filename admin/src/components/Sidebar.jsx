@@ -29,6 +29,7 @@ export default function Sidebar({ user, onLogout }) {
             <NavLink className="admin-nav-item" to="/general/users">Users</NavLink>
             <NavLink className="admin-nav-item" to="/general/roles">Roles &amp; Permissions</NavLink>
             {canManageAccounts && <NavLink className="admin-nav-item" to="/general/admin-accounts">Admin Accounts</NavLink>}
+            {canManageAccounts && <NavLink className="admin-nav-item" to="/general/user-accounts">User Accounts</NavLink>}
             <NavLink className="admin-nav-item" to="/general/unlock">Unlock Account</NavLink>
             {canSeeAudit  && <NavLink className="admin-nav-item" to="/general/impersonation-log">Impersonation Log</NavLink>}
             {canSeeAudit  && <NavLink className="admin-nav-item" to="/general/audit-log">Audit Log</NavLink>}

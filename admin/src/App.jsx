@@ -9,6 +9,7 @@ import ForgotPasswordScreen from './screens/Auth/ForgotPasswordScreen.jsx';
 import UsersScreen from './screens/General/UsersScreen.jsx';
 import RolesScreen from './screens/General/RolesScreen.jsx';
 import AdminAccountsScreen from './screens/General/AdminAccountsScreen.jsx';
+import UserAccountsScreen from './screens/General/UserAccountsScreen.jsx';
 import UnlockScreen from './screens/General/UnlockScreen.jsx';
 import ImpersonationLogScreen from './screens/General/ImpersonationLogScreen.jsx';
 import AuditLogScreen from './screens/General/AuditLogScreen.jsx';
@@ -69,6 +70,7 @@ function AdminApp({ user, onLogout, onGeoBlock }) {
                     <Route path="/general/users" element={<UsersScreen caller={caller} />} />
                     <Route path="/general/roles" element={<RolesScreen caller={caller} />} />
                     <Route path="/general/admin-accounts" element={<AdminAccountsScreen caller={caller} />} />
+                    <Route path="/general/user-accounts" element={<UserAccountsScreen caller={caller} />} />
                     <Route path="/general/unlock" element={<UnlockScreen />} />
                     <Route path="/general/impersonation-log" element={<ImpersonationLogScreen />} />
                     <Route path="/general/audit-log" element={<AuditLogScreen />} />
