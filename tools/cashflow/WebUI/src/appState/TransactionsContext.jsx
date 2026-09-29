@@ -127,7 +127,13 @@ export function TransactionsProvider({ children }) {
     }, []);
 
     useEffect(() => {
-        if (!isLoggedIn) return;
+        // Gate on BOTH conditions. isLoggedIn can be true from the sessionStorage
+        // hint before getMe() resolves, while idbReady is still false. Firing with
+        // partial state causes the spinner→chart→spinner oscillation: IDB reads
+        // return empty (key not set), then idbReady flips, and the effect re-runs
+        // with firstLoadDoneRef still false. Waiting for idbReady ensures the effect
+        // fires exactly once, after getMe() has resolved and the crypto key is set.
+        if (!isLoggedIn || !idbReady) return;
 
         let cancelled = false;
         const controller = new AbortController();
@@ -135,8 +141,6 @@ export function TransactionsProvider({ children }) {
 
         setInitialLoadError(null);
         setAllTransactionsLoaded(false);
-        // Skip the spinner if we already completed a first load (idbReady re-trigger).
-        // On a genuine retry (loadRetryCount > 0) or first load, show the spinner.
         if (!firstLoadDoneRef.current) setInitialLoading(true);
         // Do NOT wipe transactions here — IDB data stays visible during background
         // refresh so charts never flash LoadingBarsPlaceholder on returning visits.
