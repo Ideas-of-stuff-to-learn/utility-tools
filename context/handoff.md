@@ -1,3 +1,13 @@
+## Pre-Compact Snapshot — 2026-09-30 15:08
+
+**Git HEAD:** `cfd527a`
+**Files touched:** tools/cashflow/API/routes/admin.py, tools/cashflow/WebUI/src/customHooks/charts/useStackOrder.jsx, context/revert-state.md, context/known-problems.md, tools/cashflow/API/routes/categories.py...
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
 ## 2026-09-30 — Race-safe Pages deploys: 3 separate workflows + deploy-all (committed, NOT pushed)
 
 The three Pages workflows raced: one push queued three runs in one concurrency group, and GitHub keeps only one pending run, so one was cancelled. New layout in `.github/workflows/`:
@@ -17,7 +27,17 @@ Pushing this commit triggers `deploy-all.yml` (it edits `backend-url.json`). Aft
 
 ---
 
-## 2026-09-30 — QA fixes (committed, NOT pushed)
+## 2026-09-30 — Rename hardening: preferences follow category changes
+
+New `API/category_prefs.py` (`transform_stack_order`, `transform_mr_picks`, `apply_to_preferences`). Called in the same transaction by rename and combine in `routes/categories.py`, and by the hard-delete job in `routes/admin.py`. `useStackOrder.jsx` now appends categories missing from a saved order. Owner had already run the SQL migration in Supabase, so the live data was consistent; this stops it recurring.
+
+Tests written (in the scratchpad, deleted afterwards): a real-Postgres end-to-end run of the actual Flask routes (schema.sql + migrations applied, signed + CSRF requests) covering rename, combine into a new name, combine keeping an existing name, soft then hard delete, rollback atomicity and a concurrent settings save during a rename. Result: 21/21 pass with the fix, 9/21 with it disabled (fails exactly on the preference cases). Web build OK; client ordering logic 6/6. The throwaway Postgres and scripts were deleted. Not verified in a logged-in browser: the Chrome-extension and built-in browser tabs both report `document.hidden` (IndexedDB reads stall there), so the dashboard could not be exercised; the owner confirmed prod works.
+
+**Watch after deploy:** the next real rename/combine in the admin panel is the true test; afterwards run `SELECT id FROM users WHERE preferences::text LIKE '%<old name>%'` (should be empty).
+
+---
+
+## 2026-09-30 — QA fixes (pushed)
 
 Fixed from the QA report: `/home` phone overflow (`homePage.css` `.title` max-width), phone `/contents` crushed columns (`contentsStyles.css` ≤480px block + `TableHeader.jsx` clamps widths and reapplies when preferences load), category picker Escape/Cancel/`role=dialog` (`CategoryResolveModal.jsx` + `.modal-cancel-btn`), Year-view label shrink-to-fit and headroom 24→28 (`StackChartCanvas.jsx`), Data Security spacing (`DataSecurityScreen.jsx`), desktop `/contents` double scrollbars (`Layout.jsx` locks the shell on desktop contents; `.cs-container` is `flex: 1`, phone keeps `flex: none`).
 

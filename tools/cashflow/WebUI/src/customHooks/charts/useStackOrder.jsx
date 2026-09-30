@@ -16,9 +16,17 @@ export function useStackOrder(categoryNames) {
     const persist = stackPersist === true;
     const stackOrder = persist && savedOrder?.length ? savedOrder : sessionStackOrder;
 
+    // A saved order only lists the categories that existed when it was saved. Any
+    // category it doesn't mention (newly created, or renamed while the saved
+    // order still held the old name) is appended, so it can never disappear
+    // from the chart and its bar totals. Names that no longer exist are dropped.
+    const defaultOrder = categoryNames.filter(n => n !== 'Income');
     const effectiveOrder = stackOrder
-        ? stackOrder.filter(n => categoryNames.includes(n))
-        : categoryNames.filter(n => n !== 'Income');
+        ? [
+            ...stackOrder.filter(n => categoryNames.includes(n)),
+            ...defaultOrder.filter(n => !stackOrder.includes(n)),
+        ]
+        : defaultOrder;
 
     const updateOrder = useCallback((newOrder) => {
         setSessionStackOrder(newOrder);

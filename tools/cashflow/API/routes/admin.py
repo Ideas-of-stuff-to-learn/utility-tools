@@ -36,6 +36,7 @@ from email_service import send_email
 from permission_weights import compute_role_level
 from backendLocalConfig import ADMIN_LEVEL_OVERRIDE_MIN, ADMIN_AUDIT_MIN_LEVEL
 from audit import write_audit as _write_audit
+from category_prefs import apply_to_preferences
 
 _CLEANUP_SECRET = os.environ.get('CLEANUP_SECRET', '')
 
@@ -403,6 +404,9 @@ def process_pending_deletions():
                         (NEEDS_MANUAL_REVIEW, cat_name)
                     )
                     cur.execute("DELETE FROM categories WHERE name = %s", (cat_name,))
+                    # Remove it from saved chart orders and drop pending review
+                    # picks that pointed at it.
+                    apply_to_preferences(cur, {cat_name: None})
                 conn.commit()
                 deleted_categories.append(cat_name)
                 _send_deletion_confirmed_email(actor_email or owner_email, owner_email, 'category', cat_name)

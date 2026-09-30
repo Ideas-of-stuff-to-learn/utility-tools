@@ -14,6 +14,7 @@ from extensions import app, limiter
 from middleware.user_rate_limits import RL_CATEGORY_WRITE, RL_READ_CATEGORIES
 from database import get_connection, release_connection
 from cache import CategoryCache
+from category_prefs import apply_to_preferences
 from matching import patch_merchants_category_rename
 from checkingName import NEEDS_MANUAL_REVIEW
 from middleware.user_middleware import require_auth, require_permission, get_user_role_and_permissions
@@ -124,6 +125,8 @@ def update_category():
                 cur.execute("UPDATE category_records SET category = %s WHERE category = %s", (new_name, category_name))
                 cur.execute("UPDATE merchants SET category = %s WHERE category = %s", (new_name, category_name))
                 cur.execute("UPDATE transactions SET category = %s WHERE category = %s", (new_name, category_name))
+                # Saved chart orders / pending review picks hold names too.
+                apply_to_preferences(cur, {category_name: new_name})
                 category_name = new_name
 
             if new_color:
@@ -234,6 +237,10 @@ def combine_categories():
                 cur.execute("UPDATE merchants SET category = %s WHERE category = %s", (new_name, old_name))
                 cur.execute("UPDATE transactions SET category = %s WHERE category = %s", (new_name, old_name))
                 cur.execute("DELETE FROM categories WHERE name = %s", (old_name,))
+
+            # Every name that stopped existing (including the survivor's old
+            # name when it was renamed) now means new_name in saved preferences.
+            apply_to_preferences(cur, {n: new_name for n in names if n != new_name})
 
         conn.commit()
 
