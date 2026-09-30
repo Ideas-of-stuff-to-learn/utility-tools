@@ -23,7 +23,9 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    /* No overflow constraint — content grows naturally and page scrolls */
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-subtle) transparent;
 }
 
 .dashboard-home-box .btn {

@@ -1,6 +1,5 @@
-import { useRef, useEffect } from 'react';
+import { useRef } from 'react';
 import { useTransactions, useProcessing, useChartFilter } from '../appState';
-import { useUploadSession } from '../appState/UploadSessionContext';
 import { useInitialLoadLogic } from '../customHooks/homescreen/useInitialLoadLogic';
 import { useLogout } from '../customHooks/homescreen/useLogout';
 import { useFilePicker } from '../customHooks/homescreen/useFilePicker';
@@ -24,20 +23,8 @@ export default function DashboardScreen() {
     const { handleLogout } = useLogout();
     const { pickFiles, selectedFiles, status, error } = useFilePicker();
     const { categoriseSelected, loading, progress, duplicateNotice, clearDuplicateNotice } = useFileProcessor();
-    const { selectedFiles: ctxFiles, loading: ctxLoading, error: ctxError } = useUploadSession();
-    const hasUploadContent = ctxFiles.length > 0 || ctxLoading || !!ctxError;
     const notYetCategorisedCount = transactions.filter(t => t.category === NOT_YET_CATEGORISED).length;
 
-    useEffect(() => {
-        const shell = document.querySelector('.app-shell-locked');
-        if (!shell) return;
-        if (hasUploadContent) {
-            shell.classList.add('allow-scroll');
-        } else {
-            shell.classList.remove('allow-scroll');
-        }
-        return () => shell.classList.remove('allow-scroll');
-    }, [hasUploadContent]);
 
 
     const {
@@ -65,7 +52,7 @@ export default function DashboardScreen() {
     return (
         <div className="dashboard-flex">
             <div className="dashboard-home-box">
-                <div className={`dashboard-home-scroll${hasUploadContent ? ' has-upload-content' : ''}`}>
+                <div className="dashboard-home-scroll">
                     <HomepageInfo dateRangeInfo={dateRangeInfo} uploadBreakdown={uploadBreakdown} showTitle={false} />
                     <ActionButtons
                         pickFiles={pickFiles}
