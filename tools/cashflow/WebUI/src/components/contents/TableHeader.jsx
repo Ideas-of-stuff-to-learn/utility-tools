@@ -2,6 +2,7 @@ import { useRef, useCallback, useEffect } from 'react';
 import '../../styles/contentsStyles.css';
 
 const COLS = ['date', 'desc', 'amount', 'cat'];
+const MIN_APPLIED_PX = { date: 44, desc: 64, amount: 48, cat: 64 };
 
 function getColVar(col) {
     return getComputedStyle(document.documentElement).getPropertyValue(`--col-${col}`).trim();
@@ -100,11 +101,15 @@ export default function TableHeader({ selectionMode, sortField, sortAsc, onToggl
         if (columnWidths && typeof columnWidths === 'object') {
             COLS.forEach(col => {
                 const px = columnWidths[col];
-                if (px != null) setColVar(col, px);
+                // Saved widths can be tiny (a drag can end at the 30px floor); a
+                // column that narrow wraps text one letter per line, so never
+                // apply less than a readable minimum.
+                if (px != null) setColVar(col, Math.max(px, MIN_APPLIED_PX[col]));
             });
         }
-        logWidths('page load – current state');
-    }, [isMobile]); // re-run on resize so stale vars from the other surface are cleared
+    // Re-run when the surface flips (clears stale vars from the other one) AND when
+    // saved widths arrive: preferences hydrate after this mounts, and were never applied.
+    }, [isMobile, columnWidths]);
 
     return (
         <div className="table-header">

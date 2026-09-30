@@ -87,7 +87,7 @@ INSERT INTO categories (name, display_order, color, default_color) VALUES
     ('Clothes', 7, '#7A5C3D', '#7A5C3D'),
     ('Groceries and Households (medicine & stationary)', 8, '#eada18', '#eada18'),
     ('Eating out', 9, '#D97AB8', '#D97AB8'),
-    ('Accomodation & Bills', 10, '#8A3D3D', '#8A3D3D'),
+    ('Accommodation & Bills', 10, '#8A3D3D', '#8A3D3D'),
     ('Other', 11, '#bf4db1', '#bf4db1'),
     ('Income', 12, '#A67C52', '#A67C52'),
     ('Trading and investments', 13, '#4FA8D9', '#4FA8D9')

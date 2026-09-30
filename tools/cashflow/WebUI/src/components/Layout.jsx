@@ -75,7 +75,7 @@ export default function Layout() {
     }, []);
 
     return (
-        <div className={`app-shell${isDashboard ? ' app-shell-locked' : ''}`}>
+        <div className={`app-shell${isDashboard || (isContents && !isMobile) ? ' app-shell-locked' : ''}`}>
             <header className="app-header">
                 <div className="app-header-left">
                     {isDashboard

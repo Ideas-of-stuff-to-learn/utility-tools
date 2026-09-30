@@ -85,3 +85,4 @@ Use `git revert` when changes have already been pushed to origin.
 2026-09-30 | task: /auth/me in one DB round trip (was 5 sequential cross-region queries) | safe-point: cfcbd5e | status: complete
 2026-09-30 | task: backend thread safety (ThreadedConnectionPool + locked process caches) before gunicorn --threads | safe-point: a17816e | status: complete
 2026-09-30 | task: merge three Pages workflows into one (race fix + manual trigger) | safe-point: 816b6ea | status: complete
+2026-09-30 | task: QA fixes (home overflow, phone table cols, modal Escape, Year label clip, Accomodation spelling in code, Data Security copy, double scrollbars) | safe-point: 0a0d234b6a1821f6b7120e2692c5777310faf8b6 | status: complete

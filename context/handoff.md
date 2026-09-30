@@ -17,6 +17,16 @@ Pushing this commit triggers `deploy-all.yml` (it edits `backend-url.json`). Aft
 
 ---
 
+## 2026-09-30 — QA fixes (committed, NOT pushed)
+
+Fixed from the QA report: `/home` phone overflow (`homePage.css` `.title` max-width), phone `/contents` crushed columns (`contentsStyles.css` ≤480px block + `TableHeader.jsx` clamps widths and reapplies when preferences load), category picker Escape/Cancel/`role=dialog` (`CategoryResolveModal.jsx` + `.modal-cancel-btn`), Year-view label shrink-to-fit and headroom 24→28 (`StackChartCanvas.jsx`), Data Security spacing (`DataSecurityScreen.jsx`), desktop `/contents` double scrollbars (`Layout.jsx` locks the shell on desktop contents; `.cs-container` is `flex: 1`, phone keeps `flex: none`).
+
+Verified in a browser against a local fake API (deleted afterwards): home has no overflow and the title shrinks to fit; phone table description 82–91px and category 57–63px (was ~20–30); desktop page no longer scrolls while the list does and the footer sits at the bottom; picker closes via Escape, Cancel and backdrop; the Data Security phrases have their spaces; 5-digit Year totals are fully legible. Not verified: the clamp on saved widths (needs saved tiny widths to exercise), and it was not run against production.
+
+**"Accomodation" spelling:** seed fixed in `schema.sql`, plus `migrations/rename_accommodation_category.sql`. The LIVE database still has the old name until the owner renames it (admin panel preferred). Do NOT run schema.sql before that (duplicate category). Page `<title>` left as is (5.3 was not requested).
+
+---
+
 ## 2026-09-30 — Read-only browser QA round + theme-sync loop fix (committed, NOT pushed)
 
 Four read-only testers ran in the owner's Chrome (landing/auth/timing, desktop features, phone/resize, admin/API). The phone/resize tester failed (Chrome's `resize_window` doesn't work with several testers sharing one browser) and was re-run using an iframe of controlled width instead; its result is pending.

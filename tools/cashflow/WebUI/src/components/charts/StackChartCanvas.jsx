@@ -19,7 +19,7 @@ const LABEL_ROW_HEIGHT   = 24;
 const Y_AXIS_LABEL_WIDTH = 46;
 const Y_AXIS_SECTIONS    = 4;
 const TOP_PADDING        = 10;
-const LABEL_HEADROOM     = 24;
+const LABEL_HEADROOM     = 28;
 
 const FONT_BAR_LABEL = "400 10px 'Inter Tight', system-ui, sans-serif";
 const FONT_BAR_TOTAL = "600 11px 'Inter Tight', system-ui, sans-serif";
@@ -181,11 +181,21 @@ export default function StackChartCanvas({
         ctx.fillStyle = textPrimary;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'alphabetic';
+        // A label wider than its column collided with its neighbour (adjacent years
+        // with near-equal totals read as "£44,4.."), so shrink it to fit, down to 8px.
+        const maxLabelWidth = columnWidth - 3;
         stackData.forEach((bar, i) => {
             const barTopY = computeBarTotalLabelPosition(bar, { maxValue, chartHeight, heightScale, labelHeadroom: LABEL_HEADROOM, topPadding: TOP_PADDING });
             const labelY  = barTopY - 7;  // top - 18 + ~11px baseline
             const cx      = LEFT_PADDING + i * columnWidth + BAR_WIDTH / 2;
-            ctx.fillText(`£${Math.round(bar.total ?? 0).toLocaleString()}`, cx, labelY);
+            const text    = `£${Math.round(bar.total ?? 0).toLocaleString()}`;
+            ctx.font = FONT_BAR_TOTAL;
+            const width = ctx.measureText(text).width;
+            if (width > maxLabelWidth) {
+                const size = Math.max(8, Math.floor((11 * maxLabelWidth / width) * 2) / 2);
+                ctx.font = `600 ${size}px 'Inter Tight', system-ui, sans-serif`;
+            }
+            ctx.fillText(text, cx, labelY);
         });
 
         // 5. X-axis bar labels

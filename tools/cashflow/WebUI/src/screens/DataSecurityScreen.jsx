@@ -77,14 +77,14 @@ export default function DataSecurityScreen() {
                         <div className="ds-card">
                             <span className="ds-card-icon">🌐</span>
                             <p className="ds-card-title">All traffic is encrypted</p>
-                            <p className="ds-card-body">Every connection between your browser and the server uses
+                            <p className="ds-card-body">Every connection between your browser and the server uses{' '}
                             <strong>HTTPS with TLS</strong>. Your data is encrypted in transit — anyone
                             intercepting the network sees only scrambled noise.</p>
                         </div>
                         <div className="ds-card">
                             <span className="ds-card-icon">🍪</span>
                             <p className="ds-card-title">Login tokens stay out of reach</p>
-                            <p className="ds-card-body">After you log in, your session is tracked with a short-lived
+                            <p className="ds-card-body">After you log in, your session is tracked with a short-lived{' '}
                             <strong>httpOnly cookie</strong> — invisible to JavaScript. A malicious script
                             cannot steal it. Tokens expire after 24 hours; refresh tokens after 30 days.</p>
                         </div>
@@ -99,7 +99,7 @@ export default function DataSecurityScreen() {
                         <div className="ds-card">
                             <span className="ds-card-icon">⏱️</span>
                             <p className="ds-card-title">Login attempts are rate-limited</p>
-                            <p className="ds-card-body">The login endpoint accepts at most
+                            <p className="ds-card-body">The login endpoint accepts at most{' '}
                             <strong>10 requests per minute</strong> per IP. A brute-force attack
                             trying thousands of passwords is blocked automatically.</p>
                         </div>

@@ -92,7 +92,10 @@
    Contents screen — desktop layout (cs-* namespace)
    ============================================================ */
 
-.cs-container { display: flex; flex-direction: column; height: calc(100vh - 89px); background: var(--bg-page); overflow: hidden; }
+/* Desktop: Layout locks the shell to the viewport (app-shell-locked) on /contents, so this simply
+   takes the remaining height. The old calc(100vh - 89px) undercounted the header/footer/root
+   padding (~129px) and made the PAGE scroll as well as the list (double scrollbars). */
+.cs-container { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--bg-page); overflow: hidden; }
 
 /* Topbar */
 .cs-topbar { display: flex; align-items: center; gap: 12px; padding: 9px 18px; background: var(--bg-page); border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -159,6 +162,8 @@
 .duplicate-section { width: 100%; margin-bottom: 10px; }
 .duplicate-label { font-size: 13px; text-align: center; margin-bottom: 4px; color: var(--text-primary); }
 .duplicate-filenames { font-size: 13px; text-align: center; color: var(--text-secondary); margin: 0; }
+.modal-cancel-btn { margin-top: 10px; padding: 8px 20px; border-radius: 8px; border: 1px solid var(--border); background: none; color: var(--text-secondary); font-size: 14px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+.modal-cancel-btn:hover { color: var(--text-primary); border-color: var(--border-strong); }
 .modal-title-row { display: flex; justify-content: space-between; align-items: flex-start; }
 .modal-title { font-size: clamp(18px, 5vw, 30px); font-weight: 700; margin-bottom: 4px; padding-right: 8px; }
 .modal-remaining-count { font-size: 12px; font-weight: 700; color: var(--danger); background: var(--danger-bg); padding: 3px 8px; border-radius: 10px; }
@@ -203,7 +208,7 @@ justify-content: center; /* Horizontal center */
 
     /* Window virtualiser handles scroll — table is just a positioned
        container, the browser window provides the actual scroll */
-    .cs-container { height: auto; overflow: visible; }
+    .cs-container { height: auto; overflow: visible; flex: none; }
     .cs-body { overflow: visible; min-height: 0; align-items: flex-start; }
     .cs-main { overflow: visible; }
     .cs-table { overflow: visible; height: auto; max-height: none; flex: none; }
@@ -224,6 +229,19 @@ justify-content: center; /* Horizontal center */
     /* Modal: grow taller not wider on narrow screens */
     .modal-card { max-height: 90vh; max-width: calc(100vw - 32px); }
     .modal-list { overflow-y: auto; flex: 1; min-height: 0; }
+}
+
+/* Small phones: the 148px sidebar plus fixed date/amount columns left the
+   description and category columns ~30px wide (one letter per line). Give the
+   table more room and weight description over category. Custom widths the
+   user saved still win (they set --col-desc/--col-cat inline). */
+@media (max-width: 480px) {
+    :root { --col-date: 0 0 50px; --col-amount: 0 0 54px; }
+    .cs-sidebar { width: 108px; }
+    .cs-cat-item { padding: 5px 6px; gap: 4px; }
+    .cs-cat-name { font-size: 10.5px; }
+    .cell-desc { flex: var(--col-desc, 3); }
+    .cell-cat { flex: var(--col-cat, 2); }
 }
 
 /* ── Status cards (loading / error / categorising) ───────────────────────── */

@@ -1,6 +1,8 @@
 .scroll-view { background: var(--bg-page); }
 .scroll-content { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-.title { font-size: 24px; background-color: var(--bg-highlight); padding: 6px 14px; border-radius: 10px; font-weight: bold; margin-bottom: 8px; white-space: nowrap; overflow: hidden; }
+/* max-width keeps the nowrap title inside its container; without it the box grows to the
+   full text width, so the JS font-fitting (scrollWidth > offsetWidth) never triggers. */
+.title { font-size: 24px; background-color: var(--bg-highlight); padding: 6px 14px; border-radius: 10px; font-weight: bold; margin-bottom: 8px; white-space: nowrap; overflow: hidden; max-width: 100%; box-sizing: border-box; }
 .subtitle { font-size: 16px; color: var(--text-secondary); margin-bottom: 24px; }
 .range-text { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; text-align: center; }
 .btn { background: var(--primary); padding: 12px 24px; border-radius: 8px; margin-bottom: 12px; width: 100%; text-align: center; color: var(--bg-page); font-size: 16px; font-weight: 600; border: none; cursor: pointer; }
