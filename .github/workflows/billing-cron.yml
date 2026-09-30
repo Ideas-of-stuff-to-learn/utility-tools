@@ -15,7 +15,7 @@ jobs:
         run: |
           STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
             -X POST "https://utility-tools-b6dj.onrender.com/billing/send-trial-emails" \
-            -H "X-Cron-Secret: ${{ secrets.BILLING_CRON_SECRET }}" \
+            -H "Authorization: Bearer ${{ secrets.BILLING_CRON_SECRET }}" \
             -H "Content-Type: application/json")
           echo "HTTP $STATUS"
           cat /tmp/response.json
