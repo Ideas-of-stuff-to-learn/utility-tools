@@ -69,6 +69,10 @@ export async function loadBootSnapshot(userId, cryptoKey) {
                 : `local snapshot unreadable (${err?.name || 'error'}) - loaded from the network`,
             duration_ms: Date.now() - startedAt,
         });
+        // Clear the bad record so the next successful server load can write a
+        // fresh snapshot cleanly. Without this, a locked/corrupt entry would
+        // cause every subsequent visit to fall back to the network.
+        remove(uid, STORE, KEY);
         return null;
     }
 }
