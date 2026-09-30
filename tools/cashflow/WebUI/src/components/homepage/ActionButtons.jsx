@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ProgressBar from './ProgressBar';
 import { useBilling } from '../../appState/BillingContext';
 
 // Shared button cluster used identically by both HomeScreen and
@@ -101,18 +100,6 @@ export default function ActionButtons({
                 </button>
             )}
 
-            {selectedFiles.length > 0 && (
-                <div className="file-info">
-                    {selectedFiles.map(f => (
-                        <p key={f.uri || f.name} className="file-info-text">
-                            {f.name}
-                        </p>
-                    ))}
-                </div>
-            )}
-            <ProgressBar progress={progress} status={status} />
-            {error && <p className="error">{error}</p>}
-
             <button
                 className="btn btn-secondary"
                 onClick={handleCategorisePress}
@@ -135,9 +122,11 @@ export default function ActionButtons({
                 Go to Transactions
             </button>
 
-            <button className="logout-btn" onClick={onBackToTools}>
-                ← Back to Tools
-            </button>
+            <div style={{ marginTop: 'auto' }}>
+                <button className="logout-btn" onClick={onBackToTools}>
+                    ← Back to Tools
+                </button>
+            </div>
 
             {showLogoutWarn && (
                 <div className="modal-backdrop">

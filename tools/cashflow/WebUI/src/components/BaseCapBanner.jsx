@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useBilling } from '../appState/BillingContext';
 
 function useCountdown(targetIso) {
@@ -21,12 +21,33 @@ function formatMs(ms) {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export default function BaseCapBanner() {
+// compact=true → renders as a small inline note (used inside dashboard left column)
+// compact=false (default) → renders as a full-width banner strip
+export default function BaseCapBanner({ compact = false }) {
     const navigate = useNavigate();
+    const { pathname } = useLocation();
     const { hasPro, uploadCapReached, nextUploadAt } = useBilling();
     const msLeft = useCountdown(uploadCapReached ? nextUploadAt : null);
 
     if (hasPro) return null;
+    // Full banner: skip on dashboard (compact version rendered there instead)
+    if (!compact && pathname === '/dashboard') return null;
+    // Compact mode: only for dashboard
+    if (compact && pathname !== '/dashboard') return null;
+
+    if (compact) {
+        return (
+            <p className="dashboard-session-note">
+                Session-only data.{' '}
+                <button className="base-cap-banner-link" onClick={() => navigate('/pricing')}>
+                    Upgrade →
+                </button>
+                {uploadCapReached && nextUploadAt && (
+                    <span> · Next upload: <strong>{formatMs(msLeft)}</strong></span>
+                )}
+            </p>
+        );
+    }
 
     return (
         <div className="base-cap-banner">

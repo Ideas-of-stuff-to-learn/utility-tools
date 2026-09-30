@@ -11,6 +11,7 @@ import HomepageInfo from '../components/homepage/homepageInfo';
 import ChartWindowSection from '../components/charts/ChartWindowSection';
 import FilterPane from '../components/dashboard/FilterPane';
 import ActionButtons from '../components/homepage/ActionButtons';
+import BaseCapBanner from '../components/BaseCapBanner';
 import '../styles/dashboardStyles.css';
 
 export default function DashboardScreen() {
@@ -49,6 +50,7 @@ export default function DashboardScreen() {
         <div className="dashboard-flex">
             <div className="dashboard-home-box">
                 <HomepageInfo dateRangeInfo={dateRangeInfo} uploadBreakdown={uploadBreakdown} showTitle={false} />
+                <BaseCapBanner compact />
                 <ActionButtons
                     pickFiles={pickFiles}
                     selectedFiles={selectedFiles}

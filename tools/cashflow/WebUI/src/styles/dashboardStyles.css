@@ -16,6 +16,7 @@
     gap: 8px;
     position: relative;
     z-index: 1;
+    overflow: hidden;
 }
 
 .dashboard-main {

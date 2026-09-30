@@ -5,6 +5,7 @@
 2026-09-30 | task: billing base plan enforcement — daily upload cap, 1-file/batch, partial access (no full gate), direct-to-pro subscribe flow | safe-point: df7faed38e5b8dcb05bc5e5221701d91be8f1bb6 | status: complete
 2026-09-30 | task: billing base plan fix — X files per action (admin-configurable), no-persistence on logout, pricing buttons always visible | safe-point: df7faed38e5b8dcb05bc5e5221701d91be8f1bb6 | status: complete
 2026-09-30 | task: billing base UX polish — session banner, logout wipe warning, dimmed cap buttons, countdown timer | safe-point: df7faed38e5b8dcb05bc5e5221701d91be8f1bb6 | status: complete
+2026-09-30 | task: base UX fixes — upload status popup, banner layout fix, logout button always visible | safe-point: 6f928ae86487636a64e7ce007dd336f93b6a40d7 | status: in-progress
 2026-09-27 | task: security hardening — HMAC signing + CSP headers + rate limit | safe-point: 8c78077f455ff379d0a3edfeedab168d4fe7274f | status: complete
 2026-09-27 | task: fix admin account rate limits + combined require_auth decorator | safe-point: 9ae0d649394dff5372b63d1323bc1fe3660ca6e3 | status: complete
 2026-09-27 | task: restructure into middleware/ folder (4 files) | safe-point: 9ae0d649394dff5372b63d1323bc1fe3660ca6e3 | status: complete
