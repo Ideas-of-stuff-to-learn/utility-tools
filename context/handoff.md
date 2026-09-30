@@ -8,6 +8,12 @@
 
 ---
 
+## 2026-09-30 — Boot snapshot read has a 2.5 s timeout
+
+`idb/bootSnapshot.js` `loadBootSnapshot` now races the IndexedDB read + decrypt against 2.5 s. If IDB stalls (a lock left by another tab or a frozen renderer on `cashflow-db-<id>`), it returns null and the dashboard loads from the network instead of showing "Loading your charts…" forever. Found in the owner's Chrome profile: opening the DB worked but a plain read never completed, while a fresh DB was instant. Tested with a fake IDB (healthy read 3 ms, stalled read null at 2.5 s) and a clean build. To confirm on prod: the same stuck profile should now draw the chart ~2.5 s later than normal.
+
+---
+
 ## 2026-09-30 — Race-safe Pages deploys: 3 separate workflows + deploy-all (committed, NOT pushed)
 
 The three Pages workflows raced: one push queued three runs in one concurrency group, and GitHub keeps only one pending run, so one was cancelled. New layout in `.github/workflows/`:

@@ -25,6 +25,8 @@ const LEGACY_PREF_KEYS = ['chart_summary', 'chart_render_cache'];
 // new exposure. Checked against the real id before anything is decrypted.
 const UID_KEY = 'cashflow_idb_uid';
 
+const SNAPSHOT_TIMEOUT_MS = 2500;
+
 let _prefetch = null;
 let _legacyCleaned = false;
 
@@ -43,14 +45,25 @@ export async function loadBootSnapshot(userId, cryptoKey) {
     _prefetch = null;
     rememberUserId(uid);
 
-    const record = await recordPromise;
-    if (!record?.iv || !record?.data) return null;
+    // The snapshot is only a shortcut. If IndexedDB stalls (another tab or a
+    // dead renderer holding a lock on the database), give up and let the
+    // caller load from the network instead of waiting forever.
     try {
-        const snap = JSON.parse(await decryptBytes(cryptoKey, record.iv, record.data));
-        return snap?.v === SNAPSHOT_VERSION ? snap : null;
+        return await withTimeout((async () => {
+            const record = await recordPromise;
+            if (!record?.iv || !record?.data) return null;
+            const snap = JSON.parse(await decryptBytes(cryptoKey, record.iv, record.data));
+            return snap?.v === SNAPSHOT_VERSION ? snap : null;
+        })(), SNAPSHOT_TIMEOUT_MS);
     } catch {
         return null;
     }
+}
+
+function withTimeout(promise, ms) {
+    let timer;
+    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('snapshot read timed out')), ms); });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 export async function saveBootSnapshot(userId, cryptoKey, snapshot) {
