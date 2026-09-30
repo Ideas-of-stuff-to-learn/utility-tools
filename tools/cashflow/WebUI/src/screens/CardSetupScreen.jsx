@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useBilling } from '../appState/BillingContext';
-import { createSetupIntent, confirmCardSetup, startTrial } from '../api';
+import { createSetupIntent, confirmCardSetup, startTrial, subscribePro } from '../api';
 import '../styles/billing.css';
 
 export default function CardSetupScreen() {
@@ -97,6 +97,8 @@ export default function CardSetupScreen() {
 
             if (next === 'start-trial') {
                 await startTrial('cashflow');
+            } else if (next === 'subscribe' || next === 'subscribe-yearly') {
+                await subscribePro(next === 'subscribe-yearly' ? 'yearly' : 'monthly');
             }
 
             await refresh();
@@ -129,7 +131,9 @@ export default function CardSetupScreen() {
                 <p className="card-setup-subtitle">
                     {next === 'start-trial'
                         ? 'Your card is required to start the free trial. You won\'t be charged until the trial ends.'
-                        : 'Your card details are stored securely with Stripe. You can remove them at any time.'}
+                        : (next === 'subscribe' || next === 'subscribe-yearly')
+                            ? 'Your card will be charged when you confirm. You can cancel anytime from your profile.'
+                            : 'Your card details are stored securely with Stripe. You can remove them at any time.'}
                 </p>
 
                 {initError ? (
@@ -154,7 +158,14 @@ export default function CardSetupScreen() {
                                 className="btn-primary card-setup-submit"
                                 disabled={!stripe || loading}
                             >
-                                {loading ? 'Saving…' : next === 'start-trial' ? 'Save card & start trial' : 'Save card'}
+                                {loading
+                                    ? 'Saving…'
+                                    : next === 'start-trial'
+                                        ? 'Save card & start trial'
+                                        : (next === 'subscribe' || next === 'subscribe-yearly')
+                                            ? 'Save card & subscribe'
+                                            : 'Save card'
+                                }
                             </button>
                             <button
                                 type="button"

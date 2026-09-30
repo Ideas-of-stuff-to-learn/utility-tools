@@ -1,0 +1,25 @@
+name: Billing – Send Trial Emails
+
+on:
+  schedule:
+    # 8:00 AM UTC daily
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    # Allow manual trigger from the GitHub Actions UI
+
+jobs:
+  send-trial-emails:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST /billing/send-trial-emails
+        run: |
+          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST "https://utility-tools-b6dj.onrender.com/billing/send-trial-emails" \
+            -H "X-Cron-Secret: ${{ secrets.BILLING_CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          echo "HTTP $STATUS"
+          cat /tmp/response.json
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "ERROR: unexpected status $STATUS"
+            exit 1
+          fi

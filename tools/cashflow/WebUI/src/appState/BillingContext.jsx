@@ -61,10 +61,15 @@ export function BillingProvider({ children }) {
     }, [stripeConfig]);
 
     // Derived state
-    const tier          = billing?.tier ?? 'base';
-    const activeTrial   = billing?.active_trial ?? null;
-    const hasPro        = tier === 'pro' || !!activeTrial;
-    const paymentFailed = billing?.payment_failed ?? false;
+    const tier           = billing?.tier ?? 'base';
+    const activeTrial    = billing?.active_trial ?? null;
+    const hasPro         = tier === 'pro' || !!activeTrial;
+    const paymentFailed  = billing?.payment_failed ?? false;
+    const uploadCap              = billing?.upload_cap ?? null;
+    const uploadsToday           = billing?.uploads_today ?? 0;
+    const uploadFilesPerAction   = billing?.upload_files_per_action ?? null;
+    const uploadCapReached       = !hasPro && uploadCap !== null && uploadsToday >= uploadCap;
+    const nextUploadAt           = billing?.next_upload_available_at ?? null;
 
     return (
         <BillingContext.Provider value={{
@@ -73,6 +78,11 @@ export function BillingProvider({ children }) {
             hasPro,
             activeTrial,
             paymentFailed,
+            uploadCap,
+            uploadsToday,
+            uploadFilesPerAction,
+            uploadCapReached,
+            nextUploadAt,
             stripeConfig,
             stripeConfigLoading,
             refresh,

@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProgressBar from './ProgressBar';
+import { useBilling } from '../../appState/BillingContext';
 
 // Shared button cluster used identically by both HomeScreen and
 // Dashboard - editing wording/order here updates both places at once.
@@ -19,6 +21,13 @@ export default function ActionButtons({
     onDismissDuplicateNotice,
 }) {
     const navigate = useNavigate();
+    const { hasPro, uploadCapReached, uploadCap, uploadsToday, uploadFilesPerAction } = useBilling();
+    const [showLogoutWarn, setShowLogoutWarn] = useState(false);
+
+    function onBackToTools() {
+        if (!hasPro) { setShowLogoutWarn(true); return; }
+        handleLogout();
+    }
 
     const hasDuplicates = duplicateNotice && (
         duplicateNotice.filenames.length > 0 ||
@@ -61,9 +70,36 @@ export default function ActionButtons({
                     </div>
                 </div>
             )}
-            <button className="btn" onClick={pickFiles} disabled={loading || categorising}>
-                Choose CSV or Excel Files
-            </button>
+            {uploadCapReached ? (
+                <div className="upload-locked-wrap">
+                    <button className="btn btn-cap-dimmed" disabled>
+                        Cannot use — daily cap reached
+                    </button>
+                    <p className="upload-locked-hint">
+                        Limit: {uploadsToday}/{uploadCap} upload{uploadCap !== 1 ? 's' : ''} today.{' '}
+                        <button className="upload-locked-upgrade" onClick={() => navigate('/pricing')}>
+                            Upgrade for unlimited →
+                        </button>
+                    </p>
+                </div>
+            ) : !hasPro ? (
+                <div className="upload-locked-wrap">
+                    <button className="btn" onClick={pickFiles} disabled={loading || categorising}>
+                        Choose CSV or Excel Files
+                    </button>
+                    <p className="upload-locked-hint">
+                        Base plan · {uploadsToday}/{uploadCap ?? 1} upload{uploadCap !== 1 ? 's' : ''} today
+                        {uploadFilesPerAction ? ` · up to ${uploadFilesPerAction} files` : ''} ·{' '}
+                        <button className="upload-locked-upgrade" onClick={() => navigate('/pricing')}>
+                            Upgrade for unlimited →
+                        </button>
+                    </p>
+                </div>
+            ) : (
+                <button className="btn" onClick={pickFiles} disabled={loading || categorising}>
+                    Choose CSV or Excel Files
+                </button>
+            )}
 
             {selectedFiles.length > 0 && (
                 <div className="file-info">
@@ -99,9 +135,30 @@ export default function ActionButtons({
                 Go to Transactions
             </button>
 
-            <button className="logout-btn" onClick={handleLogout}>
+            <button className="logout-btn" onClick={onBackToTools}>
                 ← Back to Tools
             </button>
+
+            {showLogoutWarn && (
+                <div className="modal-backdrop">
+                    <div className="modal-card modal-card-narrow">
+                        <h1 className="modal-title" style={{ fontSize: 20, marginBottom: 12 }}>Your data will be wiped</h1>
+                        <p className="modal-desc">
+                            On the base plan, all your transactions and uploads are deleted when you log out.
+                            Upgrade to Pro or start a free trial to keep your data across sessions.
+                        </p>
+                        <button className="modal-option logout-warn-upgrade" onClick={() => { setShowLogoutWarn(false); navigate('/pricing'); }}>
+                            <span className="modal-option-text">Upgrade / Start free trial →</span>
+                        </button>
+                        <button className="modal-option" onClick={() => { setShowLogoutWarn(false); handleLogout(); }}>
+                            <span className="modal-option-text">Log out anyway — delete my data</span>
+                        </button>
+                        <button className="modal-option logout-warn-cancel" onClick={() => setShowLogoutWarn(false)}>
+                            <span className="modal-option-text">Cancel — stay in the app</span>
+                        </button>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

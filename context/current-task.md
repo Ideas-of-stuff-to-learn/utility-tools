@@ -15,7 +15,9 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 **Webhook URL for Stripe dashboard:**
 `https://utility-tools-b6dj.onrender.com/billing/webhook`
 
-**Next task:** Phase 4 — admin billing settings panel, IP management, Render Cron Job for `/billing/send-trial-emails`.
+**Billing Phase 4 complete.** Admin billing settings panel, IP management panel, and GitHub Actions cron workflow all done.
+
+**Next:** `/ship-main` when ready. After that, Stripe env vars need to be added to Render before billing goes live.
 
 ## Recently Completed
 

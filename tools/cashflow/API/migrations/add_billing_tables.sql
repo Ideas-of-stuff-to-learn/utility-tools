@@ -21,12 +21,13 @@ CREATE TABLE IF NOT EXISTS billing_settings (
 
 -- Seed default runtime values (idempotent)
 INSERT INTO billing_settings (key, value, description) VALUES
-    ('trial_length_days',       '30',   'Default free trial length in days'),
-    ('upload_cap_base',         '3',    'Max uploads allowed on base tier (no active trial/sub)'),
-    ('first_n_users_exempt',    '50',   'First N users by id skip the card-required check'),
-    ('trial_warning_day',       '28',   'Day N of trial to send the trial-ending warning email'),
-    ('stripe_price_id_pro_monthly', '', 'Stripe Price ID for pro monthly plan (set after Stripe setup)'),
-    ('stripe_price_id_pro_yearly',  '', 'Stripe Price ID for pro yearly plan (set after Stripe setup)')
+    ('trial_length_days',             '30',  'Default free trial length in days'),
+    ('upload_cap_base',               '1',   'Max upload actions per day for base tier (no active trial/sub)'),
+    ('upload_files_per_action_base',  '5',   'Max files per single upload action for base tier'),
+    ('first_n_users_exempt',          '50',  'First N users by id skip the card-required check'),
+    ('trial_warning_day',             '28',  'Day N of trial to send the trial-ending warning email'),
+    ('stripe_price_id_pro_monthly',   '',    'Stripe Price ID for pro monthly plan (set after Stripe setup)'),
+    ('stripe_price_id_pro_yearly',    '',    'Stripe Price ID for pro yearly plan (set after Stripe setup)')
 ON CONFLICT (key) DO NOTHING;
 
 -- ── user_subscriptions ───────────────────────────────────────────────────────

@@ -27,7 +27,6 @@ export default function PricingScreen() {
         if (!isLoggedIn) { navigate('/'); return; }
         setError(null);
 
-        // If card is required and not on file, go collect card first
         if (cardRequired && !cardOnFile) {
             navigate('/card-setup?next=start-trial');
             return;
@@ -51,6 +50,11 @@ export default function PricingScreen() {
         } finally {
             setLoading(false);
         }
+    }
+
+    function handleSubscribeNow(plan = 'monthly') {
+        if (!isLoggedIn) { navigate('/'); return; }
+        navigate(`/card-setup?next=subscribe${plan === 'yearly' ? '-yearly' : ''}`);
     }
 
     return (
@@ -114,16 +118,33 @@ export default function PricingScreen() {
                             <>
                                 <button
                                     className="btn-primary pricing-trial-btn"
-                                    onClick={handleStartTrial}
-                                    disabled={loading || stripeConfigLoading}
+                                    onClick={stripeEnabled ? handleStartTrial : undefined}
+                                    disabled={loading || stripeConfigLoading || !stripeEnabled}
+                                    title={!stripeEnabled ? 'Payment system setup in progress' : undefined}
                                 >
                                     {loading ? 'Starting…' : `Start ${TRIAL_DAYS}-day free trial`}
                                 </button>
-                                {cardRequired && !cardOnFile && (
+                                {!stripeEnabled && (
+                                    <p className="pricing-pending-notice">
+                                        ⏳ Payment system setup in progress — check back soon.
+                                    </p>
+                                )}
+                                {stripeEnabled && cardRequired && !cardOnFile && (
                                     <p className="pricing-card-hint">
                                         A card is required to start — you won't be charged during the trial.
                                     </p>
                                 )}
+                                <p className="pricing-skip-trial">
+                                    Already decided?{' '}
+                                    <button
+                                        className="pricing-skip-link"
+                                        onClick={stripeEnabled ? () => handleSubscribeNow('monthly') : undefined}
+                                        disabled={loading || !stripeEnabled}
+                                        title={!stripeEnabled ? 'Payment system setup in progress' : undefined}
+                                    >
+                                        Subscribe now →
+                                    </button>
+                                </p>
                                 {error && <p className="pricing-error">{error}</p>}
                             </>
                         )}
@@ -131,11 +152,6 @@ export default function PricingScreen() {
                 </div>
             </div>
 
-            {!stripeEnabled && (
-                <p className="pricing-stripe-notice">
-                    Payment processing is being set up — check back soon.
-                </p>
-            )}
         </div>
     );
 }

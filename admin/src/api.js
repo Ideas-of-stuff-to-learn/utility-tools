@@ -407,6 +407,29 @@ export async function getClientEvents({ hours = 168, kind = '', limit = 200, off
     return await parseJson(r, 'Failed to fetch failed network calls');
 }
 
+// ── Billing settings ─────────────────────────────────────────────────────────
+
+export async function getBillingSettings() {
+    const r = await authFetch(`${BASE_URL}/admin/billing/settings`);
+    return parseJson(r, 'Failed to load billing settings');
+}
+
+export async function updateBillingSettings(updates) {
+    const r = await authFetch(`${BASE_URL}/admin/billing/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+    });
+    return parseJson(r, 'Failed to update billing settings');
+}
+
+export async function getIpLog({ limit = 200, offset = 0, ip = '' } = {}) {
+    const params = new URLSearchParams({ limit, offset });
+    if (ip) params.set('ip', ip);
+    const r = await authFetch(`${BASE_URL}/admin/billing/ip-log?${params}`);
+    return parseJson(r, 'Failed to load IP log');
+}
+
 // Returns {geo_blocked, message} on suspicious activity, or null if ok.
 export async function postGeoHeartbeat() {
     const r = await authFetch(`${BASE_URL}/admin/geo/heartbeat`, { method: 'POST' });

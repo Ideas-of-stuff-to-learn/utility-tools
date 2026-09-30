@@ -6,6 +6,7 @@ import RoleBadge from './RoleBadge';
 import ThemeToggle from './ThemeToggle';
 import ChartFootnote from './charts/ChartFootnote';
 import TrialBanner from './TrialBanner';
+import BaseCapBanner from './BaseCapBanner';
 import { useIsMobile } from '../customHooks/useIsMobile';
 import { useThemeSync } from '../customHooks/useThemeSync';
 import '../styles/Layout.css';
@@ -113,6 +114,7 @@ export default function Layout() {
             </header>
             <div className="app-content">
                 <TrialBanner />
+                <BaseCapBanner />
                 <Outlet />
             </div>
             <footer className="app-footer">

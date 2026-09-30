@@ -61,34 +61,44 @@ def parse_csv():
     current_user = int(get_jwt_identity())
 
     # ── Base-tier upload cap ──────────────────────────────────────────────────
-    # Users on base tier (no active trial or subscription) are limited to
-    # upload_cap_base uploads. Fetch cap from billing_settings; default to 3
-    # if the billing tables don't exist yet (safe during migration).
+    # Base users are limited to upload_cap_base uploads per 24 hours, and to
+    # 1 file per upload batch. If billing tables don't exist yet, allow upload.
+    billing = {'tier': 'base', 'active_trial': None}
+    files_per_action_cap = 5  # default; overridden from billing_settings below
     conn_check = get_connection()
     try:
         billing = get_billing_status(conn_check, current_user)
-        if not billing.get('tier') == 'pro' and not billing.get('active_trial'):
+        if billing.get('tier') != 'pro' and not billing.get('active_trial'):
             try:
                 with conn_check.cursor() as cur:
-                    cur.execute(
-                        "SELECT value FROM billing_settings WHERE key = 'upload_cap_base'",
-                    )
-                    row = cur.fetchone()
-                    upload_cap = int(row[0]) if row else 3
+                    cur.execute("""
+                        SELECT key, value FROM billing_settings
+                         WHERE key IN ('upload_cap_base', 'upload_files_per_action_base')
+                    """)
+                    settings = {r[0]: int(r[1]) for r in cur.fetchall()}
+                upload_cap              = settings.get('upload_cap_base', 1)
+                files_per_action_cap    = settings.get('upload_files_per_action_base', 5)
+
                 with conn_check.cursor() as cur:
                     cur.execute(
-                        "SELECT COUNT(*) FROM uploads WHERE user_id = %s",
+                        "SELECT COUNT(*) FROM uploads WHERE user_id = %s"
+                        "  AND created_at >= NOW() - INTERVAL '1 day'",
                         (current_user,),
                     )
-                    total_uploads = cur.fetchone()[0]
-                if total_uploads >= upload_cap:
+                    uploads_today = cur.fetchone()[0]
+
+                if uploads_today >= upload_cap:
                     return jsonify({
-                        'error': f'Upload limit reached. Base accounts can upload up to {upload_cap} files. Start a free trial for unlimited uploads.',
+                        'error': (
+                            f'Daily upload limit reached. Base accounts get {upload_cap} upload action'
+                            f'{"s" if upload_cap != 1 else ""} per day. Upgrade for unlimited uploads.'
+                        ),
                         'code': 'upload_cap_reached',
                         'upload_cap': upload_cap,
+                        'uploads_today': uploads_today,
                     }), 403
             except Exception:
-                pass  # billing tables not yet migrated — allow upload
+                pass  # billing tables not yet migrated — use defaults
     finally:
         release_connection(conn_check)
 
@@ -96,6 +106,15 @@ def parse_csv():
         return jsonify({"error": "No files provided"}), 400
 
     uploaded_files = request.files.getlist('files')
+
+    # Base-tier: cap files per upload action
+    is_base = billing.get('tier') != 'pro' and not billing.get('active_trial')
+    if is_base and len(uploaded_files) > files_per_action_cap:
+        return jsonify({
+            'error': f'Base accounts can upload up to {files_per_action_cap} files per action. Upgrade for unlimited.',
+            'code': 'files_per_action_exceeded',
+            'files_per_action_cap': files_per_action_cap,
+        }), 403
     parsed_rows = []
     seen_lines = set()
     # Which dedup_keys each filename first introduced within this

@@ -1035,6 +1035,19 @@ def logout_route():
                 (current_user,),
             )
 
+        # Base-tier: no data persistence — delete uploaded transactions on logout.
+        try:
+            from routes.billing import get_billing_status
+            billing = get_billing_status(conn, current_user)
+            if billing.get('tier') != 'pro' and not billing.get('active_trial'):
+                with conn.cursor() as cur:
+                    # Delete transactions first (they reference uploads via source_upload_id)
+                    cur.execute("DELETE FROM transactions WHERE user_id = %s", (current_user,))
+                    cur.execute("DELETE FROM uploads WHERE user_id = %s", (current_user,))
+        except Exception as e:
+            app.logger.warning(f'Base-tier data cleanup on logout failed for user {current_user}: {e}')
+            # Non-fatal — proceed with logout anyway
+
         conn.commit()
         resp = jsonify({'status': 'ok'})
         unset_jwt_cookies(resp)

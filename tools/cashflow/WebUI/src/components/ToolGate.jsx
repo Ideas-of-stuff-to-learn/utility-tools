@@ -1,39 +1,17 @@
-import { useNavigate } from 'react-router-dom';
 import { useBilling } from '../appState/BillingContext';
 import { useAuth } from '../appState/AuthContext';
-import '../styles/billing.css';
 
 /**
- * Wraps any tool screen. If the user doesn't have pro access (active sub
- * or active trial), shows a gate screen prompting them to start a trial.
- * If the user has pro, renders children as normal.
+ * Wraps any tool screen. All users enter — base users see the app but
+ * with upload locked when they've hit their daily cap.
+ * The upload-locked state is handled inside ActionButtons.
  */
-export default function ToolGate({ tool = 'cashflow', children }) {
+export default function ToolGate({ children }) {
     const { isChecking }  = useAuth();
-    const { hasPro, billing } = useBilling();
-    const navigate = useNavigate();
+    const { billing }     = useBilling();
 
-    // While auth is still resolving, render nothing (avoid flash of gate)
+    // While auth is still resolving, render nothing (avoid flash)
     if (isChecking || billing === null) return null;
 
-    if (hasPro) return children;
-
-    return (
-        <div className="tool-gate">
-            <div className="tool-gate-icon">📊</div>
-            <h2>Start your free trial</h2>
-            <p>
-                Get {30} days of full Cashflow access — transaction tracking,
-                charts, and auto-categorisation — completely free.
-            </p>
-            <div className="tool-gate-actions">
-                <button
-                    className="btn-primary"
-                    onClick={() => navigate('/pricing')}
-                >
-                    See plans &amp; start trial
-                </button>
-            </div>
-        </div>
-    );
+    return children;
 }

@@ -40,6 +40,10 @@ export default function Sidebar({ user, onLogout }) {
             <NavLink className="admin-nav-item" to="/cashflow/categories">Categories</NavLink>
             <NavLink className="admin-nav-item" to="/cashflow/user-transactions">User Transactions</NavLink>
 
+            <div className="admin-sidebar-section">Billing</div>
+            <NavLink className="admin-nav-item" to="/billing/settings">Billing Settings</NavLink>
+            <NavLink className="admin-nav-item" to="/billing/ip-management">IP Management</NavLink>
+
             <div style={{ marginTop: 'auto', padding: '12px 16px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <button className="btn btn-ghost btn-sm" style={{ width: '100%', justifyContent: 'center' }} onClick={onLogout}>Sign out</button>
                 <a className="admin-nav-back" href={LANDING_URL}>← Back to utility-tools</a>

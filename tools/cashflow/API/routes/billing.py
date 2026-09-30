@@ -105,8 +105,41 @@ def get_billing_status(conn, user_id: int) -> dict:
             'expires_at': grant_expires_at.isoformat() if grant_expires_at else None,
         }
 
+    # Base-tier upload usage for today
+    upload_cap               = None
+    uploads_today            = None
+    upload_files_per_action  = None
+    next_upload_available_at = None
+    effective_tier = tier or 'base'
+    if effective_tier != 'pro' and not active_trial:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT key, value FROM billing_settings
+                     WHERE key IN ('upload_cap_base', 'upload_files_per_action_base')
+                """)
+                bs = {r[0]: int(r[1]) for r in cur.fetchall()}
+            upload_cap              = bs.get('upload_cap_base', 1)
+            upload_files_per_action = bs.get('upload_files_per_action_base', 5)
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*), MIN(created_at) FROM uploads WHERE user_id = %s"
+                    "  AND created_at >= NOW() - INTERVAL '1 day'",
+                    (user_id,)
+                )
+                row = cur.fetchone()
+                uploads_today = row[0]
+                oldest_in_window = row[1]
+            from datetime import timedelta
+            next_upload_available_at = (
+                (oldest_in_window + timedelta(days=1)).isoformat()
+                if oldest_in_window else None
+            )
+        except Exception:
+            pass
+
     return {
-        'tier': tier or 'base',
+        'tier': effective_tier,
         'stripe_status': stripe_status,
         'current_period_end': period_end.isoformat() if period_end else None,
         'cancel_at_period_end': bool(cancel_at_period_end),
@@ -115,6 +148,10 @@ def get_billing_status(conn, user_id: int) -> dict:
         'card_brand': card_brand,
         'active_trial': active_trial,
         'access_grant': access_grant,
+        'upload_cap': upload_cap,
+        'uploads_today': uploads_today,
+        'upload_files_per_action': upload_files_per_action,
+        'next_upload_available_at': next_upload_available_at,
     }
 
 
@@ -600,6 +637,105 @@ def billing_confirm_setup():
         release_connection(conn)
 
 
+# ── POST /billing/subscribe ──────────────────────────────────────────────────
+
+DISABLE_RL_BILLING_SUBSCRIBE = False
+RL_BILLING_SUBSCRIBE = _rl("5 per minute; 20 per day", "DISABLE_RL_BILLING_SUBSCRIBE")
+
+
+@app.route('/billing/subscribe', methods=['POST'])
+@jwt_required()
+@limiter.limit(RL_BILLING_SUBSCRIBE)
+def billing_subscribe():
+    """
+    Start a paid Pro subscription immediately (skip the free trial).
+    Requires a card already on file. Creates a Stripe Subscription
+    using stripe_price_id_pro_monthly from billing_settings.
+    Returns updated billing status on success.
+    """
+    if not _STRIPE_SECRET_KEY:
+        return jsonify({'error': 'Payment system not yet configured', 'code': 'stripe_not_configured'}), 503
+
+    user_id = int(get_jwt_identity())
+    body    = request.get_json(silent=True) or {}
+    plan    = body.get('plan', 'monthly')  # 'monthly' | 'yearly'
+
+    conn = get_connection()
+    try:
+        # Fetch price ID and customer ID
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT bs_m.value, bs_y.value,
+                       s.stripe_customer_id, s.card_last4
+                  FROM billing_settings bs_m,
+                       billing_settings bs_y,
+                       users u
+                  LEFT JOIN user_subscriptions s ON s.user_id = u.id
+                 WHERE bs_m.key = 'stripe_price_id_pro_monthly'
+                   AND bs_y.key = 'stripe_price_id_pro_yearly'
+                   AND u.id = %s
+            """, (user_id,))
+            row = cur.fetchone()
+
+        if not row:
+            return jsonify({'error': 'User not found'}), 404
+
+        price_id_monthly, price_id_yearly, customer_id, card_last4 = row
+        price_id = price_id_yearly if plan == 'yearly' else price_id_monthly
+
+        if not price_id:
+            return jsonify({'error': 'Subscription prices not yet configured', 'code': 'prices_not_configured'}), 503
+
+        if not customer_id:
+            return jsonify({'error': 'No Stripe customer found — please add a card first', 'code': 'no_customer'}), 402
+
+        if not card_last4:
+            return jsonify({'error': 'A card is required to subscribe', 'code': 'card_required'}), 402
+
+        # Create Stripe subscription
+        sub = _stripe_post('/subscriptions', {
+            'customer': customer_id,
+            'items[0][price]': price_id,
+            'payment_behavior': 'error_if_incomplete',
+            'expand[]': 'latest_invoice.payment_intent',
+        })
+
+        sub_id     = sub.get('id')
+        sub_status = sub.get('status')
+        period_end_ts = sub.get('current_period_end')
+        import datetime
+        period_end = (
+            datetime.datetime.fromtimestamp(period_end_ts, tz=datetime.timezone.utc)
+            if period_end_ts else None
+        )
+
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE user_subscriptions
+                   SET tier                   = 'pro',
+                       stripe_subscription_id = %s,
+                       stripe_status          = %s,
+                       current_period_end     = %s,
+                       updated_at             = NOW()
+                 WHERE user_id = %s
+            """, (sub_id, sub_status, period_end, user_id))
+
+        conn.commit()
+        app.logger.info(f'Subscription started: user={user_id} plan={plan} sub={sub_id}')
+        return jsonify(get_billing_status(conn, user_id)), 200
+
+    except Exception as e:
+        try: conn.rollback()
+        except Exception: pass
+        err_str = str(e)
+        app.logger.error(f'/billing/subscribe failed for user {user_id}: {err_str}')
+        if 'card_declined' in err_str or 'insufficient_funds' in err_str:
+            return jsonify({'error': 'Card declined. Please update your payment method.', 'code': 'card_declined'}), 402
+        return jsonify({'error': 'Failed to start subscription'}), 500
+    finally:
+        release_connection(conn)
+
+
 # ── Stripe HTTP helpers ───────────────────────────────────────────────────────
 
 import base64
@@ -755,3 +891,141 @@ def _send_trial_ended_email(to_email: str, name: str, tool: str):
     <p><a href="{os.environ.get('FRONTEND_BASE_URL', '')}/pricing">Upgrade now →</a></p>
     """
     send_email(to_email, subject, html)
+
+
+# ── Admin: billing settings ───────────────────────────────────────────────────
+
+@app.route('/admin/billing/settings', methods=['GET'])
+def admin_billing_settings_get():
+    from middleware.admin_middleware import require_admin_auth
+    err = require_admin_auth('billing.view')
+    if err: return err
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT key, value, description, updated_at, updated_by
+                FROM billing_settings ORDER BY key
+            """)
+            rows = cur.fetchall()
+        settings = [
+            {
+                'key': r[0],
+                'value': r[1],
+                'description': r[2],
+                'updated_at': r[3].isoformat() if r[3] else None,
+                'updated_by': r[4],
+            }
+            for r in rows
+        ]
+        return jsonify({'settings': settings}), 200
+    except Exception as e:
+        app.logger.error(f'GET /admin/billing/settings failed: {e}')
+        return jsonify({'error': 'Failed to load billing settings'}), 500
+    finally:
+        release_connection(conn)
+
+
+@app.route('/admin/billing/settings', methods=['PUT'])
+def admin_billing_settings_put():
+    from middleware.admin_middleware import require_admin_auth
+    from flask_jwt_extended import get_jwt_identity
+    err = require_admin_auth('billing.edit')
+    if err: return err
+
+    body = request.get_json(silent=True) or {}
+    updates = body.get('updates', {})
+    if not updates or not isinstance(updates, dict):
+        return jsonify({'error': 'updates must be a non-empty object'}), 400
+
+    ALLOWED_KEYS = {
+        'trial_length_days', 'upload_cap_base', 'upload_files_per_action_base',
+        'first_n_users_exempt', 'trial_warning_day',
+        'stripe_price_id_pro_monthly', 'stripe_price_id_pro_yearly',
+    }
+    bad_keys = [k for k in updates if k not in ALLOWED_KEYS]
+    if bad_keys:
+        return jsonify({'error': f'Unknown setting key(s): {bad_keys}'}), 400
+
+    admin_id_str = get_jwt_identity()
+    try:
+        admin_id = int(admin_id_str) if admin_id_str else None
+    except (TypeError, ValueError):
+        admin_id = None
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            for key, value in updates.items():
+                cur.execute("""
+                    UPDATE billing_settings
+                       SET value = %s, updated_at = NOW(), updated_by = %s
+                     WHERE key = %s
+                """, (str(value), admin_id, key))
+        conn.commit()
+        return jsonify({'ok': True}), 200
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f'PUT /admin/billing/settings failed: {e}')
+        return jsonify({'error': 'Failed to update billing settings'}), 500
+    finally:
+        release_connection(conn)
+
+
+# ── Admin: IP unlock log ──────────────────────────────────────────────────────
+
+@app.route('/admin/billing/ip-log', methods=['GET'])
+def admin_billing_ip_log():
+    from middleware.admin_middleware import require_admin_auth
+    err = require_admin_auth('billing.view')
+    if err: return err
+
+    limit = min(int(request.args.get('limit', 200)), 1000)
+    offset = max(int(request.args.get('offset', 0)), 0)
+    ip_filter = request.args.get('ip', '').strip()
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            if ip_filter:
+                cur.execute("""
+                    SELECT l.id, l.ip_address, l.action, l.reason,
+                           l.performed_by, u.username AS performed_by_username,
+                           l.performed_at, l.metadata
+                      FROM ip_unlock_log l
+                      LEFT JOIN users u ON u.id = l.performed_by
+                     WHERE l.ip_address ILIKE %s
+                     ORDER BY l.performed_at DESC
+                     LIMIT %s OFFSET %s
+                """, (f'%{ip_filter}%', limit, offset))
+            else:
+                cur.execute("""
+                    SELECT l.id, l.ip_address, l.action, l.reason,
+                           l.performed_by, u.username AS performed_by_username,
+                           l.performed_at, l.metadata
+                      FROM ip_unlock_log l
+                      LEFT JOIN users u ON u.id = l.performed_by
+                     ORDER BY l.performed_at DESC
+                     LIMIT %s OFFSET %s
+                """, (limit, offset))
+            rows = cur.fetchall()
+        entries = [
+            {
+                'id': r[0],
+                'ip_address': r[1],
+                'action': r[2],
+                'reason': r[3],
+                'performed_by': r[4],
+                'performed_by_username': r[5],
+                'performed_at': r[6].isoformat() if r[6] else None,
+                'metadata': r[7],
+            }
+            for r in rows
+        ]
+        return jsonify({'entries': entries, 'offset': offset, 'limit': limit}), 200
+    except Exception as e:
+        app.logger.error(f'GET /admin/billing/ip-log failed: {e}')
+        return jsonify({'error': 'Failed to load IP log'}), 500
+    finally:
+        release_connection(conn)

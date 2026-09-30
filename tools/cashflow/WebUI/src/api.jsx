@@ -947,6 +947,16 @@ export async function confirmCardSetup(paymentMethodId, tool) {
     return parseJsonResponse(response, 'Failed to confirm card setup');
 }
 
+// Start a paid subscription immediately (skip trial). plan = 'monthly' | 'yearly'.
+export async function subscribePro(plan = 'monthly') {
+    const response = await authorizedFetch(`${BASE_URL}/billing/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+    });
+    return parseJsonResponse(response, 'Failed to start subscription');
+}
+
 // Cancel an active trial early.
 export async function cancelTrial(tool) {
     const response = await authorizedFetch(`${BASE_URL}/billing/cancel-trial`, {

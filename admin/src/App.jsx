@@ -17,6 +17,8 @@ import GeoLogsScreen from './screens/General/GeoLogsScreen.jsx';
 import ClientEventsScreen from './screens/General/ClientEventsScreen.jsx';
 import CategoriesScreen from './screens/Cashflow/CategoriesScreen.jsx';
 import UserTransactionsScreen from './screens/Cashflow/UserTransactionsScreen.jsx';
+import BillingSettingsScreen from './screens/Billing/BillingSettingsScreen.jsx';
+import IpManagementScreen from './screens/Billing/IpManagementScreen.jsx';
 
 const IDLE_TIMEOUT_MS   = 30 * 60 * 1000; // 30 minutes
 const GEO_HEARTBEAT_MS  = 10 * 60 * 1000; // 10 minutes
@@ -79,6 +81,8 @@ function AdminApp({ user, onLogout, onGeoBlock }) {
                     <Route path="/general/failed-calls" element={<ClientEventsScreen />} />
                     <Route path="/cashflow/categories" element={<CategoriesScreen />} />
                     <Route path="/cashflow/user-transactions" element={<UserTransactionsScreen caller={caller} />} />
+                    <Route path="/billing/settings" element={<BillingSettingsScreen />} />
+                    <Route path="/billing/ip-management" element={<IpManagementScreen />} />
                     <Route path="*" element={<Navigate to="/general/users" replace />} />
                 </Routes>
             </main>

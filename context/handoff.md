@@ -1,3 +1,23 @@
+## Pre-Compact Snapshot — 2026-09-30 20:33
+
+**Git HEAD:** `df7faed`
+**Files touched:** admin/src/components/Sidebar.jsx, tools/cashflow/WebUI/src/appState/BillingContext.jsx, tools/cashflow/API/routes/billing.py, context/current-task.md, tools/cashflow/API/migrations/add_billing_tables.sql...
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
+## Pre-Compact Snapshot — 2026-09-30 20:09
+
+**Git HEAD:** `df7faed`
+**Files touched:** context/revert-state.md
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
 ## 2026-09-30 — Billing Phase 3 complete
 
 **Done:**
