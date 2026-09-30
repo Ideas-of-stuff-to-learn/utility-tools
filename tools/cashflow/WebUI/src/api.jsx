@@ -905,3 +905,54 @@ export async function getChartSummary() {
 
     return await parseJsonResponse(response, 'Failed to fetch chart summary');
 }
+
+// ── Billing ───────────────────────────────────────────────────────────────────
+
+// Public — no auth. Returns { stripe_enabled, publishable_key }.
+export async function getBillingConfig() {
+    const response = await fetchWithTimeout(`${BASE_URL}/billing/config`, { method: 'GET' }, 10000);
+    return parseJsonResponse(response, 'Failed to fetch billing config');
+}
+
+// Authenticated. Returns the current user's tier/trial/subscription state.
+export async function getBillingStatus() {
+    const response = await authorizedFetch(`${BASE_URL}/billing/status`, { method: 'GET' });
+    return parseJsonResponse(response, 'Failed to fetch billing status');
+}
+
+// Start a free trial for the given tool. Returns updated billing status.
+export async function startTrial(tool) {
+    const response = await authorizedFetch(`${BASE_URL}/billing/start-trial`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool }),
+    });
+    return parseJsonResponse(response, 'Failed to start trial');
+}
+
+// Create a Stripe SetupIntent to collect a card without charging.
+// Returns { client_secret } to pass to Stripe Elements.
+export async function createSetupIntent() {
+    const response = await authorizedFetch(`${BASE_URL}/billing/create-setup-intent`, { method: 'POST' });
+    return parseJsonResponse(response, 'Failed to create setup intent');
+}
+
+// Confirm that a card was saved and optionally start a subscription.
+export async function confirmCardSetup(paymentMethodId, tool) {
+    const response = await authorizedFetch(`${BASE_URL}/billing/confirm-setup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_method_id: paymentMethodId, tool }),
+    });
+    return parseJsonResponse(response, 'Failed to confirm card setup');
+}
+
+// Cancel an active trial early.
+export async function cancelTrial(tool) {
+    const response = await authorizedFetch(`${BASE_URL}/billing/cancel-trial`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool }),
+    });
+    return parseJsonResponse(response, 'Failed to cancel trial');
+}

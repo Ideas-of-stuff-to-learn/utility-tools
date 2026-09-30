@@ -1,0 +1,382 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   BILLING — PricingScreen, CardSetupScreen, ToolGate, trial banners
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Pricing page ─────────────────────────────────────────────────────────── */
+
+.pricing-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 20px 60px;
+}
+
+.pricing-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.pricing-header h1 {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-h2);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    margin: 0 0 8px;
+}
+
+.pricing-subtitle {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    margin: 0;
+}
+
+.pricing-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+@media (max-width: 600px) {
+    .pricing-cards { grid-template-columns: 1fr; }
+}
+
+.pricing-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 28px 24px;
+    position: relative;
+}
+
+.pricing-card-featured {
+    background: var(--bg-page);
+    border-color: var(--primary);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+
+.pricing-card-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary);
+    color: #fff;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 99px;
+    white-space: nowrap;
+}
+
+.pricing-card-header {
+    margin-bottom: 20px;
+}
+
+.pricing-tier-name {
+    display: block;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 8px;
+}
+
+.pricing-price {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+
+.pricing-amount {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-h2);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+}
+
+.pricing-period {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.pricing-yearly-hint {
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+}
+
+.pricing-features {
+    list-style: none;
+    margin: 0 0 24px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pricing-feature {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+}
+
+.pricing-feature::before {
+    content: '✓';
+    color: var(--primary);
+    font-weight: var(--font-weight-bold);
+    flex-shrink: 0;
+}
+
+.pricing-feature-muted {
+    color: var(--text-secondary);
+}
+
+.pricing-feature-muted::before {
+    content: '—';
+    color: var(--text-secondary);
+}
+
+.pricing-cta {
+    min-height: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pricing-trial-btn {
+    width: 100%;
+}
+
+.pricing-current-plan {
+    font-size: var(--font-size-sm);
+    color: var(--primary);
+    font-weight: var(--font-weight-medium);
+    text-align: center;
+    display: block;
+}
+
+.pricing-cta-label {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    text-align: center;
+    display: block;
+}
+
+.pricing-card-hint {
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    text-align: center;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.pricing-error {
+    font-size: var(--font-size-xs);
+    color: var(--danger);
+    margin: 0;
+}
+
+.pricing-stripe-notice {
+    text-align: center;
+    margin-top: 32px;
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+}
+
+/* ── Card setup ───────────────────────────────────────────────────────────── */
+
+.card-setup-page {
+    max-width: 480px;
+    margin: 60px auto;
+    padding: 0 20px;
+}
+
+.card-setup-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 36px 32px;
+}
+
+.card-setup-disabled {
+    text-align: center;
+}
+
+.card-setup-icon {
+    font-size: 40px;
+    margin-bottom: 16px;
+}
+
+.card-setup-card h2 {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-h3);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    margin: 0 0 8px;
+}
+
+.card-setup-subtitle {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin: 0 0 28px;
+    line-height: 1.5;
+}
+
+.card-setup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.card-setup-field-label {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 6px;
+}
+
+.card-setup-stripe-field {
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 14px 16px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    transition: border-color 0.15s;
+}
+
+.card-setup-stripe-field:focus-within {
+    border-color: var(--primary);
+}
+
+.card-setup-stripe-field--loading {
+    opacity: 0.6;
+}
+
+.card-setup-placeholder {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* The Stripe iframe fills its container */
+.card-setup-stripe-field .StripeElement {
+    width: 100%;
+}
+
+.card-setup-error {
+    font-size: var(--font-size-sm);
+    color: var(--danger);
+    margin: 0;
+}
+
+.card-setup-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.card-setup-submit {
+    width: 100%;
+}
+
+.card-setup-stripe-badge {
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    text-align: center;
+    margin: 0;
+}
+
+/* ── Tool gate (shown when user has base tier and tries to access a tool) ──── */
+
+.tool-gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 24px;
+    text-align: center;
+    gap: 16px;
+}
+
+.tool-gate-icon {
+    font-size: 48px;
+    line-height: 1;
+}
+
+.tool-gate h2 {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-h4);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.tool-gate p {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin: 0;
+    max-width: 320px;
+    line-height: 1.5;
+}
+
+.tool-gate-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+/* ── Trial banner (shown at top of tool screens during active trial) ────────── */
+
+.trial-banner {
+    background: var(--primary-light);
+    border-bottom: 1px solid var(--primary-muted);
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: var(--font-size-xs);
+    color: var(--primary);
+    flex-wrap: wrap;
+}
+
+.trial-banner strong {
+    font-weight: var(--font-weight-bold);
+}
+
+.trial-banner-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* ── Payment failed banner ───────────────────────────────────────────────────── */
+
+.payment-failed-banner {
+    background: var(--bg-warning);
+    border-bottom: 1px solid var(--warning-border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    flex-wrap: wrap;
+}
+
+.payment-failed-banner strong {
+    color: var(--danger);
+}

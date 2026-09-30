@@ -28,6 +28,7 @@ from middleware.user_rate_limits import (
 )
 from database import get_connection, release_connection
 from middleware.user_middleware import get_user_role_and_permissions, user_has_permission
+from routes.billing import get_billing_status
 from email_service import send_email
 
 FRONTEND_BASE_URL = os.environ.get('FRONTEND_BASE_URL', 'http://localhost:5173')
@@ -88,6 +89,7 @@ def _load_me_fallback(conn, user_id):
         'level': level,
         'permissions': perms,
         'idb_key': get_or_create_dek(conn, user_id),
+        'billing': get_billing_status(conn, user_id),
     }
 
 
@@ -122,6 +124,7 @@ def _load_me(conn, user_id):
         'level': level,
         'permissions': perms,
         'idb_key': dek_b64_from_stored(enc_dek, iv) if enc_dek else get_or_create_dek(conn, user_id),
+        'billing': get_billing_status(conn, user_id),
     }
 
 
@@ -150,6 +153,7 @@ def auth_me():
             'csrf_refresh_token': get_csrf_token(refresh_cookie) if refresh_cookie else None,
             'idb_key': me['idb_key'],
             'hmac_signing_secret': derive_signing_secret(str(current_user), access_jti),
+            'billing': me['billing'],
         }), 200
     except Exception as e:
         app.logger.error(f'Fetching own identity failed for user {current_user}: {e}')

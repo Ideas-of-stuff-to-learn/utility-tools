@@ -24,6 +24,7 @@ from extensions import app, limiter
 from middleware.user_rate_limits import RL_UPLOAD
 from database import get_connection, release_connection
 from .shared_helpers import sanitize_cell, MAX_CSV_FILE_SIZE_BYTES
+from routes.billing import get_billing_status
 
 
 def _rows_from_excel(raw_bytes, filename):
@@ -58,6 +59,38 @@ def _rows_from_excel(raw_bytes, filename):
 @limiter.limit(RL_UPLOAD)
 def parse_csv():
     current_user = int(get_jwt_identity())
+
+    # ── Base-tier upload cap ──────────────────────────────────────────────────
+    # Users on base tier (no active trial or subscription) are limited to
+    # upload_cap_base uploads. Fetch cap from billing_settings; default to 3
+    # if the billing tables don't exist yet (safe during migration).
+    conn_check = get_connection()
+    try:
+        billing = get_billing_status(conn_check, current_user)
+        if not billing.get('tier') == 'pro' and not billing.get('active_trial'):
+            try:
+                with conn_check.cursor() as cur:
+                    cur.execute(
+                        "SELECT value FROM billing_settings WHERE key = 'upload_cap_base'",
+                    )
+                    row = cur.fetchone()
+                    upload_cap = int(row[0]) if row else 3
+                with conn_check.cursor() as cur:
+                    cur.execute(
+                        "SELECT COUNT(*) FROM uploads WHERE user_id = %s",
+                        (current_user,),
+                    )
+                    total_uploads = cur.fetchone()[0]
+                if total_uploads >= upload_cap:
+                    return jsonify({
+                        'error': f'Upload limit reached. Base accounts can upload up to {upload_cap} files. Start a free trial for unlimited uploads.',
+                        'code': 'upload_cap_reached',
+                        'upload_cap': upload_cap,
+                    }), 403
+            except Exception:
+                pass  # billing tables not yet migrated — allow upload
+    finally:
+        release_connection(conn_check)
 
     if 'files' not in request.files:
         return jsonify({"error": "No files provided"}), 400

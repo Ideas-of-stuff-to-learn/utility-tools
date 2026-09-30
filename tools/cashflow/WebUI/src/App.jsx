@@ -5,6 +5,7 @@ import RequireAuth from './components/RequiresAuth';
 import ResponsiveGate from './components/ResponsiveGate';
 import Layout from './components/Layout';
 import ManualReviewGate from './components/manualReview/ManualReviewGate';
+import ToolGate from './components/ToolGate';
 
 import HomeScreen from './screens/HomeScreen';
 import DashboardScreen from './screens/Dashboard';
@@ -14,6 +15,8 @@ import AccessibilityScreen from './screens/AccessibilityScreen';
 import CookiesScreen from './screens/CookiesScreen';
 import DataSecurityScreen from './screens/DataSecurityScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import PricingScreen from './screens/PricingScreen';
+import CardSetupScreen from './screens/CardSetupScreen';
 
 const ChartsScreen = lazy(() => import('./screens/ChartsScreen'));
 const ContentsScreen = lazy(() => import('./screens/ContentsScreen'));
@@ -31,11 +34,13 @@ function AppContent() {
         <Route element={<ResponsiveGate />}>
           <Route path="/" element={null} />
           <Route element={<Layout />}>
-            <Route path="/dashboard" element={<RequireAuth><DashboardScreen /></RequireAuth>} />
-            <Route path="/home" element={<RequireAuth><HomeScreen /></RequireAuth>} />
-            <Route path="/charts" element={<RequireAuth><Suspense fallback={null}><ChartsScreen /></Suspense></RequireAuth>} />
-            <Route path="/contents" element={<RequireAuth><Suspense fallback={null}><ContentsScreen /></Suspense></RequireAuth>} />
-            <Route path="/profile" element={<RequireAuth><ProfileScreen /></RequireAuth>} />
+            <Route path="/pricing"    element={<RequireAuth><PricingScreen /></RequireAuth>} />
+            <Route path="/card-setup" element={<RequireAuth><CardSetupScreen /></RequireAuth>} />
+            <Route path="/dashboard"  element={<RequireAuth><ToolGate><DashboardScreen /></ToolGate></RequireAuth>} />
+            <Route path="/home"       element={<RequireAuth><ToolGate><HomeScreen /></ToolGate></RequireAuth>} />
+            <Route path="/charts"     element={<RequireAuth><ToolGate><Suspense fallback={null}><ChartsScreen /></Suspense></ToolGate></RequireAuth>} />
+            <Route path="/contents"   element={<RequireAuth><ToolGate><Suspense fallback={null}><ContentsScreen /></Suspense></ToolGate></RequireAuth>} />
+            <Route path="/profile"    element={<RequireAuth><ProfileScreen /></RequireAuth>} />
           </Route>
         </Route>
       </Routes>

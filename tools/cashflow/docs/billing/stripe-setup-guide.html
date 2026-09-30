@@ -1,0 +1,559 @@
+<title>Stripe Setup Guide</title>
+<style>
+  /* Layout: vertical steps with illustrated dashboard mockups */
+  :root {
+    --bg: #f8f9fb;
+    --bg2: #ffffff;
+    --fg: #111827;
+    --fg2: #4b5563;
+    --fg3: #9ca3af;
+    --accent: #635bff;
+    --accent-light: #ede9ff;
+    --success: #0d9f6e;
+    --success-light: #d1fae5;
+    --warn: #d97706;
+    --warn-light: #fef3c7;
+    --border: #e5e7eb;
+    --step-bg: #ffffff;
+    --mockup-bg: #1a1f36;
+    --mockup-sidebar: #0a0e1f;
+    --mockup-accent: #635bff;
+    --mockup-text: #e8eaf0;
+    --mockup-text2: #8892a4;
+    --mockup-highlight: #635bff;
+    --mockup-row: rgba(255,255,255,0.04);
+    --mockup-row-hover: rgba(99,91,255,0.15);
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1117;
+      --bg2: #1a1d27;
+      --fg: #f1f3f9;
+      --fg2: #9ca3af;
+      --fg3: #4b5563;
+      --accent: #7c73ff;
+      --accent-light: #2a2550;
+      --success: #34d399;
+      --success-light: #064e3b;
+      --warn: #fbbf24;
+      --warn-light: #451a03;
+      --border: #272b3a;
+      --step-bg: #1a1d27;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.4);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1117;
+    --bg2: #1a1d27;
+    --fg: #f1f3f9;
+    --fg2: #9ca3af;
+    --fg3: #4b5563;
+    --accent: #7c73ff;
+    --accent-light: #2a2550;
+    --success: #34d399;
+    --success-light: #064e3b;
+    --warn: #fbbf24;
+    --warn-light: #451a03;
+    --border: #272b3a;
+    --step-bg: #1a1d27;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.4);
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, sans-serif;
+    margin: 0;
+    padding-inline: 20px;
+    padding-block: 48px;
+    line-height: 1.6;
+  }
+
+  .page { max-width: 780px; margin: 0 auto; }
+
+  /* Header */
+  .header { text-align: center; margin-bottom: 56px; }
+  .header .logo {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--accent); color: #fff;
+    border-radius: 14px; padding: 10px 20px;
+    font-size: 15px; font-weight: 700; letter-spacing: -.3px;
+    margin-bottom: 24px;
+  }
+  .header h1 {
+    font-size: clamp(26px, 5vw, 38px);
+    font-weight: 800; letter-spacing: -1px;
+    margin: 0 0 12px; text-wrap: balance;
+  }
+  .header p {
+    color: var(--fg2); font-size: 17px; max-width: 480px;
+    margin: 0 auto; text-wrap: balance;
+  }
+
+  .time-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--success-light); color: var(--success);
+    border-radius: 999px; padding: 5px 14px;
+    font-size: 13px; font-weight: 600; margin-top: 16px;
+  }
+
+  /* Steps */
+  .steps { display: flex; flex-direction: column; gap: 32px; }
+
+  .step {
+    background: var(--step-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .step-header {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 24px 28px 20px;
+  }
+
+  .step-num {
+    flex-shrink: 0;
+    width: 36px; height: 36px;
+    background: var(--accent); color: #fff;
+    border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 15px; font-weight: 700;
+    margin-top: 2px;
+  }
+
+  .step-title { font-size: 20px; font-weight: 700; letter-spacing: -.4px; margin: 0 0 6px; }
+  .step-desc { color: var(--fg2); font-size: 15px; margin: 0; }
+
+  .step-body { padding: 0 28px 28px; }
+
+  /* Mockup */
+  .mockup {
+    background: var(--mockup-bg);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-lg);
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  .mockup-bar {
+    background: var(--mockup-sidebar);
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .mockup-dots { display: flex; gap: 6px; }
+  .mockup-dots span {
+    width: 10px; height: 10px; border-radius: 50%;
+    display: block;
+  }
+  .mockup-dots span:nth-child(1) { background: #ff5f57; }
+  .mockup-dots span:nth-child(2) { background: #febc2e; }
+  .mockup-dots span:nth-child(3) { background: #28c840; }
+  .mockup-url {
+    flex: 1; background: rgba(255,255,255,0.07); border-radius: 6px;
+    padding: 5px 12px; font-size: 12px; color: var(--mockup-text2);
+  }
+
+  .mockup-layout { display: flex; }
+  .mockup-sidebar-nav {
+    width: 180px; flex-shrink: 0;
+    background: var(--mockup-sidebar);
+    padding: 16px 0; min-height: 200px;
+  }
+  .mockup-sidebar-nav .nav-logo {
+    padding: 0 16px 16px;
+    font-size: 16px; font-weight: 700; color: var(--mockup-text);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 8px;
+  }
+  .mockup-nav-item {
+    padding: 7px 16px;
+    font-size: 12px; color: var(--mockup-text2);
+    cursor: default;
+  }
+  .mockup-nav-item.active {
+    background: var(--mockup-row-hover);
+    color: #a5a0ff;
+    border-right: 2px solid var(--mockup-accent);
+  }
+  .mockup-nav-item.section-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
+    color: rgba(136,146,164,0.5); padding-top: 14px;
+  }
+
+  .mockup-main { flex: 1; padding: 20px; overflow: hidden; }
+  .mockup-main h3 {
+    color: var(--mockup-text); font-size: 14px; font-weight: 600;
+    margin: 0 0 14px; letter-spacing: -.2px;
+  }
+
+  /* Key display */
+  .key-row {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+  }
+  .key-label { font-size: 11px; color: var(--mockup-text2); margin-bottom: 4px; }
+  .key-value { font-size: 12px; font-family: monospace; color: var(--mockup-text); }
+  .key-copy {
+    flex-shrink: 0;
+    background: var(--mockup-accent);
+    color: #fff; border: none; border-radius: 7px;
+    padding: 6px 12px; font-size: 11px; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+  }
+  .key-hidden { letter-spacing: 2px; color: var(--mockup-text2); }
+
+  /* Callout */
+  .callout {
+    display: flex; gap: 12px; align-items: flex-start;
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;
+  }
+  .callout.warn { background: var(--warn-light); }
+  .callout.info { background: var(--accent-light); }
+  .callout.success { background: var(--success-light); }
+  .callout-icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+  .callout-text { font-size: 14px; color: var(--fg); line-height: 1.5; }
+  .callout-text strong { display: block; margin-bottom: 2px; }
+
+  /* Instructions list */
+  .instruction-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  .instruction-list li {
+    display: flex; gap: 12px; align-items: flex-start;
+    font-size: 15px; color: var(--fg2);
+  }
+  .instruction-list li .bullet {
+    flex-shrink: 0; width: 22px; height: 22px;
+    background: var(--accent-light); color: var(--accent);
+    border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 11px; font-weight: 700;
+    margin-top: 2px;
+  }
+  .instruction-list li strong { color: var(--fg); }
+
+  /* Test badge */
+  .test-mode-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #febc2e22; color: #d97706;
+    border: 1px solid #febc2e44; border-radius: 6px;
+    padding: 3px 10px; font-size: 11px; font-weight: 700;
+    letter-spacing: .04em;
+  }
+  .test-dot { width: 7px; height: 7px; border-radius: 50%; background: #febc2e; display: inline-block; }
+
+  /* What you end up with */
+  .keys-summary {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+  }
+  .keys-summary h3 { margin: 0 0 16px; font-size: 16px; font-weight: 700; }
+  .key-item { margin-bottom: 12px; }
+  .key-item:last-child { margin-bottom: 0; }
+  .key-item .label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--fg3); margin-bottom: 4px; font-weight: 600;
+  }
+  .key-item .value {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 13px; background: var(--step-bg);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; color: var(--accent);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px;
+  }
+  .key-item .value span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .copy-btn {
+    flex-shrink: 0; background: none; border: 1px solid var(--border);
+    border-radius: 6px; padding: 3px 9px; font-size: 11px; font-weight: 600;
+    color: var(--fg2); cursor: pointer;
+  }
+  .copy-btn:hover { background: var(--border); }
+
+  /* Toggle mockup */
+  .toggle-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .toggle-switch {
+    width: 36px; height: 20px; border-radius: 99px;
+    display: flex; align-items: center; padding: 2px;
+    flex-shrink: 0;
+  }
+  .toggle-switch.on { background: var(--mockup-accent); justify-content: flex-end; }
+  .toggle-switch.off { background: rgba(255,255,255,0.15); justify-content: flex-start; }
+  .toggle-knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .toggle-label { font-size: 12px; color: var(--mockup-text); }
+  .toggle-badge {
+    font-size: 10px; font-weight: 700; letter-spacing: .05em;
+    padding: 2px 7px; border-radius: 99px;
+  }
+  .toggle-badge.on { background: #febc2e22; color: #febc2e; }
+  .toggle-badge.off { background: rgba(255,255,255,0.07); color: var(--mockup-text2); }
+
+  /* Webhook mockup */
+  .webhook-row {
+    background: rgba(255,255,255,0.04); border-radius: 8px;
+    padding: 12px 14px; margin-bottom: 8px;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .webhook-method {
+    font-size: 10px; font-weight: 700; padding: 2px 7px;
+    border-radius: 4px; background: #0d9f6e22; color: #0d9f6e;
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .webhook-url { font-size: 12px; color: var(--mockup-text); font-family: monospace; }
+  .webhook-status { font-size: 10px; color: var(--mockup-text2); margin-top: 2px; }
+
+  /* Footer */
+  .footer {
+    text-align: center; margin-top: 56px; padding-top: 32px;
+    border-top: 1px solid var(--border); color: var(--fg3); font-size: 13px;
+  }
+
+  @media (max-width: 600px) {
+    .mockup-sidebar-nav { display: none; }
+    .step-header { padding: 20px 20px 16px; }
+    .step-body { padding: 0 20px 20px; }
+    .key-row { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+
+<div class="page">
+
+  <div class="header">
+    <div class="logo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Stripe Setup
+    </div>
+    <h1>Getting your Stripe account ready</h1>
+    <p>Follow these steps in order. You only need to do this once.</p>
+    <div class="time-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      About 10–15 minutes
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <!-- Step 1 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Create your Stripe account</div>
+          <div class="step-desc">Go to stripe.com and sign up. Use your real name and business details.</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <ul class="instruction-list">
+          <li><span class="bullet">→</span><span>Go to <strong>stripe.com</strong> and click <strong>"Start now"</strong></span></li>
+          <li><span class="bullet">→</span><span>Enter your email address and create a password</span></li>
+          <li><span class="bullet">→</span><span>Verify your email when the confirmation arrives</span></li>
+          <li><span class="bullet">→</span><span>Fill in the business questions — choose <strong>Individual / Sole trader</strong> if unsure</span></li>
+          <li><span class="bullet">→</span><span>You can <strong>skip the bank account step</strong> for now — we'll come back to that later</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">Make sure Test Mode is on</div>
+          <div class="step-desc">Test mode lets you try everything out without real money moving. It should be on by default.</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <div class="mockup">
+          <div class="mockup-bar">
+            <div class="mockup-dots"><span></span><span></span><span></span></div>
+            <div class="mockup-url">dashboard.stripe.com</div>
+            <div class="test-mode-badge"><span class="test-dot"></span> TEST MODE</div>
+          </div>
+          <div style="padding: 20px;">
+            <div class="toggle-row">
+              <div class="toggle-switch on"><div class="toggle-knob"></div></div>
+              <div class="toggle-label">Test mode</div>
+              <div class="toggle-badge on">ON — no real money</div>
+            </div>
+            <div class="toggle-row" style="border-bottom: none;">
+              <div class="toggle-switch off"><div class="toggle-knob"></div></div>
+              <div class="toggle-label" style="color: rgba(232,234,240,0.4);">Live mode</div>
+              <div class="toggle-badge off">Only switch when ready to launch</div>
+            </div>
+          </div>
+        </div>
+        <div class="callout warn">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-text"><strong>Look for the orange "Test mode" badge in the top bar.</strong> If you don't see it, there's a toggle in the top-right corner of the dashboard — make sure it's on.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Get your API keys</div>
+          <div class="step-desc">These are the codes that connect your website to Stripe. You need two of them.</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <ul class="instruction-list" style="margin-bottom: 20px;">
+          <li><span class="bullet">1</span><span>Click <strong>Developers</strong> in the top-right corner of the dashboard</span></li>
+          <li><span class="bullet">2</span><span>Click <strong>API keys</strong> in the left menu that appears</span></li>
+          <li><span class="bullet">3</span><span>You'll see the two keys shown below</span></li>
+        </ul>
+
+        <div class="mockup">
+          <div class="mockup-bar">
+            <div class="mockup-dots"><span></span><span></span><span></span></div>
+            <div class="mockup-url">dashboard.stripe.com/test/apikeys</div>
+          </div>
+          <div class="mockup-layout">
+            <div class="mockup-sidebar-nav">
+              <div class="nav-logo">Developers</div>
+              <div class="mockup-nav-item active">API keys</div>
+              <div class="mockup-nav-item">Webhooks</div>
+              <div class="mockup-nav-item">Events</div>
+              <div class="mockup-nav-item">Logs</div>
+            </div>
+            <div class="mockup-main">
+              <h3>API keys — Test mode</h3>
+              <div class="key-row">
+                <div>
+                  <div class="key-label">Publishable key</div>
+                  <div class="key-value">pk_test_51A<span class="key-hidden">••••••••••••••••••••</span></div>
+                </div>
+                <button class="key-copy">Copy</button>
+              </div>
+              <div class="key-row">
+                <div>
+                  <div class="key-label">Secret key</div>
+                  <div class="key-value">sk_test_<span class="key-hidden">•••••••••••••••••••••••</span></div>
+                </div>
+                <button class="key-copy" style="background: #0d9f6e;">Reveal &amp; Copy</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout info">
+          <div class="callout-icon">💡</div>
+          <div class="callout-text"><strong>The secret key is hidden by default.</strong> Click "Reveal test key" first, then copy it. Keep it somewhere safe — don't paste it into a chat or email.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">4</div>
+        <div>
+          <div class="step-title">Add a webhook endpoint</div>
+          <div class="step-desc">This tells Stripe where to send notifications when payments happen.</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <ul class="instruction-list" style="margin-bottom: 20px;">
+          <li><span class="bullet">1</span><span>Still in <strong>Developers</strong>, click <strong>Webhooks</strong> in the left menu</span></li>
+          <li><span class="bullet">2</span><span>Click <strong>"+ Add endpoint"</strong></span></li>
+          <li><span class="bullet">3</span><span>Your developer will give you the exact URL to enter here</span></li>
+          <li><span class="bullet">4</span><span>After saving, click the endpoint and click <strong>"Reveal"</strong> next to Signing secret</span></li>
+        </ul>
+
+        <div class="mockup">
+          <div class="mockup-bar">
+            <div class="mockup-dots"><span></span><span></span><span></span></div>
+            <div class="mockup-url">dashboard.stripe.com/test/webhooks</div>
+          </div>
+          <div class="mockup-layout">
+            <div class="mockup-sidebar-nav">
+              <div class="nav-logo">Developers</div>
+              <div class="mockup-nav-item">API keys</div>
+              <div class="mockup-nav-item active">Webhooks</div>
+              <div class="mockup-nav-item">Events</div>
+              <div class="mockup-nav-item">Logs</div>
+            </div>
+            <div class="mockup-main">
+              <h3>Webhook endpoints</h3>
+              <div class="webhook-row">
+                <div class="webhook-method">POST</div>
+                <div>
+                  <div class="webhook-url">https://your-backend.onrender.com/stripe/webhook</div>
+                  <div class="webhook-status">← Your developer will give you this URL</div>
+                </div>
+              </div>
+              <div class="key-row" style="margin-top: 14px;">
+                <div>
+                  <div class="key-label">Signing secret</div>
+                  <div class="key-value">whsec_<span class="key-hidden">••••••••••••••••••••</span></div>
+                </div>
+                <button class="key-copy">Reveal &amp; Copy</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5 — summary -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">✓</div>
+        <div>
+          <div class="step-title">What you'll have at the end</div>
+          <div class="step-desc">Three codes to pass to your developer. That's all they need.</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <div class="keys-summary">
+          <h3>Three keys to send your developer</h3>
+          <div class="key-item">
+            <div class="label">Publishable key</div>
+            <div class="value"><span>pk_test_51A…</span><span style="font-size:11px;color:var(--fg3);">Starts with pk_test_</span></div>
+          </div>
+          <div class="key-item">
+            <div class="label">Secret key</div>
+            <div class="value"><span>sk_test_51A…</span><span style="font-size:11px;color:var(--fg3);">Starts with sk_test_</span></div>
+          </div>
+          <div class="key-item">
+            <div class="label">Webhook signing secret</div>
+            <div class="value"><span>whsec_…</span><span style="font-size:11px;color:var(--fg3);">Starts with whsec_</span></div>
+          </div>
+        </div>
+
+        <div class="callout success" style="margin-top: 16px; margin-bottom: 0;">
+          <div class="callout-icon">✅</div>
+          <div class="callout-text"><strong>That's it — you're done.</strong> Your developer handles everything else. You don't need to touch Stripe again until you're ready to accept real payments.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    This guide is for test mode only — no real money moves until you switch to Live mode.
+  </div>
+
+</div>
