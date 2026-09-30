@@ -20,7 +20,7 @@ import bcrypt
 
 from extensions import app, limiter
 from hmac_auth import derive_signing_secret
-from crypto.idb_keys import get_or_create_dek
+from crypto.idb_keys import get_or_create_dek, dek_b64_from_stored
 from middleware.user_rate_limits import (
     RL_AUTH_ME, RL_AUTH_LOGIN, RL_AUTH_SIGNUP, RL_AUTH_REFRESH,
     RL_AUTH_LOGOUT, RL_AUTH_EMAIL_SEND, RL_AUTH_FORGOT_PASSWORD,
@@ -47,6 +47,84 @@ _LOGIN_TIER2_MINUTES  = 60
 _LOGIN_PERMANENT_SENTINEL = '9999-01-01 00:00:00+00'
 
 
+# Everything /auth/me needs in ONE round trip. It used to be five sequential
+# queries (profile, role, role permissions, overrides, IDB key); with the DB
+# in another region each costs ~200 ms, and /auth/me gates every page load.
+# Same semantics as get_user_role_and_permissions(): no role → ('user', 0, {}),
+# otherwise role permissions + granted overrides − revoked (not-true) ones.
+_ME_BUNDLE_SQL = """
+    SELECT u.username, u.email, u.display_name, u.email_verified, u.pending_email,
+           r.name, r.level,
+           ARRAY(SELECT p.key FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
+                  WHERE rp.role_id = u.role_id),
+           ARRAY(SELECT p.key FROM user_permission_overrides o JOIN permissions p ON p.id = o.permission_id
+                  WHERE o.user_id = u.id AND o.granted IS TRUE),
+           ARRAY(SELECT p.key FROM user_permission_overrides o JOIN permissions p ON p.id = o.permission_id
+                  WHERE o.user_id = u.id AND o.granted IS NOT TRUE),
+           k.enc_dek, k.iv
+      FROM users u
+      LEFT JOIN roles r ON r.id = u.role_id
+      LEFT JOIN user_idb_keys k ON k.user_id = u.id
+     WHERE u.id = %s
+"""
+
+
+def _load_me_fallback(conn, user_id):
+    """The original multi-query path, used if the single query can't run."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT username, email, display_name, email_verified, pending_email FROM users WHERE id = %s",
+            (user_id,)
+        )
+        row = cur.fetchone()
+    role_name, level, perms = get_user_role_and_permissions(conn, user_id)
+    return {
+        'username': row[0] if row else None,
+        'email': row[1] if row else None,
+        'display_name': row[2] if row else None,
+        'email_verified': row[3] if row else False,
+        'pending_email': row[4] if row else None,
+        'role': role_name,
+        'level': level,
+        'permissions': perms,
+        'idb_key': get_or_create_dek(conn, user_id),
+    }
+
+
+def _load_me(conn, user_id):
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_ME_BUNDLE_SQL, (user_id,))
+            row = cur.fetchone()
+    except Exception as e:
+        app.logger.warning(f'/auth/me single-query path failed, using fallback: {e}')
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        row = None
+    if row is None:
+        return _load_me_fallback(conn, user_id)
+
+    (username, email, display_name, email_verified, pending_email,
+     role_name, level, role_perms, granted, revoked, enc_dek, iv) = row
+    if role_name is None:
+        role_name, level, perms = 'user', 0, set()
+    else:
+        perms = (set(role_perms) | set(granted)) - set(revoked)
+    return {
+        'username': username,
+        'email': email,
+        'display_name': display_name,
+        'email_verified': email_verified,
+        'pending_email': pending_email,
+        'role': role_name,
+        'level': level,
+        'permissions': perms,
+        'idb_key': dek_b64_from_stored(enc_dek, iv) if enc_dek else get_or_create_dek(conn, user_id),
+    }
+
+
 @app.route('/auth/me', methods=['GET'])
 @jwt_required()
 @limiter.limit(RL_AUTH_ME)
@@ -54,34 +132,23 @@ def auth_me():
     current_user = int(get_jwt_identity())
     conn = get_connection()
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT username, email, display_name, email_verified, pending_email FROM users WHERE id = %s",
-                (current_user,)
-            )
-            row = cur.fetchone()
-        username = row[0] if row else None
-        email = row[1] if row else None
-        display_name = row[2] if row else None
-        email_verified = row[3] if row else False
-        pending_email = row[4] if row else None
-        role_name, level, perms = get_user_role_and_permissions(conn, current_user)
+        me = _load_me(conn, current_user)
         access_cookie  = request.cookies.get('access_token_cookie')
         refresh_cookie = request.cookies.get('refresh_token_cookie')
         access_jti = get_jwt().get('jti', '')
         return jsonify({
             'id': current_user,
-            'username': username,
-            'email': email,
-            'email_verified': email_verified,
-            'pending_email': pending_email,
-            'display_name': display_name,
-            'role': role_name,
-            'level': level,
-            'permissions': sorted(perms),
+            'username': me['username'],
+            'email': me['email'],
+            'email_verified': me['email_verified'],
+            'pending_email': me['pending_email'],
+            'display_name': me['display_name'],
+            'role': me['role'],
+            'level': me['level'],
+            'permissions': sorted(me['permissions']),
             'csrf_access_token':  get_csrf_token(access_cookie)  if access_cookie  else None,
             'csrf_refresh_token': get_csrf_token(refresh_cookie) if refresh_cookie else None,
-            'idb_key': get_or_create_dek(conn, current_user),
+            'idb_key': me['idb_key'],
             'hmac_signing_secret': derive_signing_secret(str(current_user), access_jti),
         }), 200
     except Exception as e:

@@ -49,6 +49,9 @@ They reset on every deploy and differ per gunicorn worker.
 **Open: `tools/cashflow/WebUI/src/components/StartupScreen.jsx` is now unused.**
 Cashflow never shows a full-page startup screen. Safe to delete (not deleted: it predates the session that orphaned it).
 
+**Open (measured 2026-09-30): the backend and the database are in different regions.**
+Supabase is `aws-0-eu-west-1` (Ireland), and the Render service is almost certainly US (the default is Oregon). Each DB query costs ~200 ms. A warm cashflow return visit measured 1.6 s: `/auth/me` took 1.42 s of that (vs a 215 ms `/health` round trip), while the snapshot decrypt and paint took ~0.12 s. `/auth/me` is now 2 queries instead of 6. Moving Render to Frankfurt would cut every query to ~20 ms. That needs a new Render service, because the region can't be changed in place, and every hard-coded `cashflow2-0.onrender.com` must be updated if the URL changes.
+
 **Open: the Render backend sleeps after ~15 min idle.**
 The GitHub keep-alive workflow only pings Supabase. A cold backend now shows "Still connecting…" inside the chart area instead of a full-page screen.
 

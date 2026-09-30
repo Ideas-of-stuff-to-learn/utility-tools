@@ -1,3 +1,19 @@
+## 2026-09-30 — Measured the "slow return visit" in the owner's real Chrome
+
+**Measurements (Claude in Chrome, read-only):**
+- Cold backend: `/auth/me` 15.5 s (landing shows "Server is waking up").
+- Warm return visits (Back to Tools → Cashflow, 3 runs): `/auth/me` ~1.42 s each, chart painted at 1.6–2.2 s, "Still connecting" never appeared.
+- The encrypted snapshot is 440 KB; decrypt and paint take ~0.12 s after the key arrives.
+- `appliedChartTheme` = `polished`, so the theme-recolour burst isn't firing for the owner. (It does fire on every visit for non-owners without `categories.recolor`: 13 PATCHes each get a 403 and the flag is never set. Still open.)
+
+**Conclusion:** "Still connecting" = Render cold start. The warm-visit floor is `/auth/me`, and its cost is cross-region DB latency (Supabase eu-west-1, Render likely Oregon, ~200 ms per query). Collapsed `/auth/me` to one query (`_ME_BUNDLE_SQL` in routes/auth.py, with the legacy multi-query fallback). Ghost test 8/8.
+
+**Owner decisions pending:**
+- Move Render to Frankfurt.
+- Handle cold starts: keep-alive ping or a paid instance.
+
+---
+
 ## 2026-09-30 — White screen follow-up: entry URL before router + deep links
 
 The user still saw white after `5197aad`. The live bundle did contain the fix, so that report was most likely the 10-minute Pages cache combined with landing prefetching cashflow.

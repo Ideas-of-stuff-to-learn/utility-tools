@@ -48,6 +48,12 @@ def _decrypt_dek(enc_dek_b64: str, iv_b64: str) -> bytes:
     return _AESGCM.decrypt(iv, ciphertext, None)
 
 
+def dek_b64_from_stored(enc_dek_b64: str, iv_b64: str) -> str:
+    """Plaintext DEK (base64) from a user_idb_keys row the caller already
+    fetched — lets /auth/me load the key in the same query as everything else."""
+    return base64.b64encode(_decrypt_dek(enc_dek_b64, iv_b64)).decode()
+
+
 def get_or_create_admin_dek(conn, admin_user_id: int) -> str:
     """Same envelope-encryption pattern as get_or_create_dek but for admin_users.
     Uses admin_idb_keys table (references admin_users, not users).
