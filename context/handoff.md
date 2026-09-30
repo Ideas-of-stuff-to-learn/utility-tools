@@ -1,3 +1,46 @@
+## 2026-09-30 — Billing Phase 3 complete
+
+**Done:**
+- Cashflow `ProfilePopup.jsx`: billing section (tier badge, trial countdown, upgrade CTA) via `useBilling()`
+- Landing `ProfilePopup.jsx`: billing section reading `userRole.billing` directly; upgrade links to cashflow root
+- Both `ProfilePopup.css`: added billing section styles
+- `Layout.jsx`: `<TrialBanner />` wired above `<Outlet />`
+- Landing footer: "Plans & Pricing" link → cashflow root
+
+**Next:** Phase 4 — admin billing section, IP management, Render Cron Job setup
+
+---
+
+## Pre-Compact Snapshot — 2026-09-30 19:28
+
+**Git HEAD:** `1916c8a`
+**Files touched:** context/handoff.md, context/session-snapshot.md
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
+## Pre-Compact Snapshot — 2026-09-30 18:51
+
+**Git HEAD:** `c809ba6`
+**Files touched:** context/session-snapshot.md, context/handoff.md
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
+## Pre-Compact Snapshot — 2026-09-30 16:26
+
+**Git HEAD:** `50c3261`
+**Files touched:** (none — no uncommitted changes)
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
 ## Pre-Compact Snapshot — 2026-09-30 15:08
 
 **Git HEAD:** `cfd527a`

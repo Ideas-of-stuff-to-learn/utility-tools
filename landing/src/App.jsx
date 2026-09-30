@@ -116,6 +116,9 @@ function LandingPage() {
 
       <footer className="footer">
         <p>© {new Date().getFullYear()} Utility Tools. All rights reserved.</p>
+        <p className="footer-links">
+          <a href={import.meta.env.DEV ? 'http://localhost:5173' : '/utility-tools/cashflow/'}>Plans &amp; Pricing</a>
+        </p>
       </footer>
     </div>
   );

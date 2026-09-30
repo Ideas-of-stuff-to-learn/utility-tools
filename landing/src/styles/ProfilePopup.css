@@ -93,3 +93,44 @@
     text-decoration: none;
     font-weight: 500;
 }
+
+.profile-billing-section {
+    margin: 0 0 4px;
+}
+
+.profile-billing-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 4px 2px;
+}
+
+.profile-tier-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.02em;
+}
+
+.profile-tier-badge.tier-pro {
+    background: rgba(79, 142, 247, 0.15);
+    color: #4f8ef7;
+}
+
+.profile-tier-badge.tier-base {
+    background: var(--hover-bg, rgba(0,0,0,0.06));
+    color: var(--text-secondary);
+}
+
+.profile-trial-days {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.profile-upgrade-btn {
+    color: #4f8ef7;
+    font-weight: 500;
+    text-decoration: none;
+    display: block;
+}

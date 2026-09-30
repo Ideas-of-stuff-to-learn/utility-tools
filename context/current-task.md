@@ -1,13 +1,21 @@
 <!-- last-verified: a834bca 2026-09-23 -->
 # Cashflow2.0 — Current Task
 
-## Status (2026-09-29)
+## Status (2026-09-30)
 
-No active task. Cashflow boot overhaul shipped (see Recently Completed).
+Billing Phases 1–3 complete. Phase 4 (admin billing section + cron job) pending.
 
-**Watch after deploy:** return visits to cashflow (Back to Tools → Cashflow, reloads, new tabs) must never show a full-page spinner or "server waking up". Also check Render's auto-deploy settings, since the Render redeploy for the backend part is what adds `/auth/csrf` and `/sync/state`.
+**Stripe env vars to add (Render + local .env):**
+```
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
 
-**Next task:** Tasks 3+4 (Stripe billing, P1 Critical) or Task 10 (React Native update — last).
+**Webhook URL for Stripe dashboard:**
+`https://utility-tools-b6dj.onrender.com/billing/webhook`
+
+**Next task:** Phase 4 — admin billing settings panel, IP management, Render Cron Job for `/billing/send-trial-emails`.
 
 ## Recently Completed
 

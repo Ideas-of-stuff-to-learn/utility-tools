@@ -1,18 +1,14 @@
-# Session Snapshot — 2026-09-30 15:08
+# Session Snapshot — 2026-09-30 19:28
 
-**Git HEAD:** `cfd527a`
+**Git HEAD:** `1916c8a`
 **Triggered by:** PreCompact (context window about to be summarised)
 
 ## Active Task
 (no active task)
 
 ## Files Touched This Session
-- tools/cashflow/API/routes/admin.py
-- tools/cashflow/WebUI/src/customHooks/charts/useStackOrder.jsx
-- context/revert-state.md
-- context/known-problems.md
-- tools/cashflow/API/routes/categories.py
 - context/handoff.md
+- context/session-snapshot.md
 
 ## Context
 This snapshot was auto-written before context summarisation.

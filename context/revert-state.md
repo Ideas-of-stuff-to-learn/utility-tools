@@ -1,5 +1,6 @@
 <!-- last-verified: f366d81 2026-09-24 -->
-2026-09-30 | task: billing Phase 1+2 — config, migration, billing route, /auth/me, trial flow, card setup, pricing UI, upload cap, email triggers | safe-point: c809ba6ad28e6dcd2d11f5993b705c49cd3875bd | status: in-progress
+2026-09-30 | task: billing Phase 1+2 — config, migration, billing route, /auth/me, trial flow, card setup, pricing UI, upload cap, email triggers | safe-point: c809ba6ad28e6dcd2d11f5993b705c49cd3875bd | status: complete
+2026-09-30 | task: billing Phase 3 — ProfilePopup billing section (cashflow + landing), TrialBanner in Layout, pricing link on landing | safe-point: 1916c8ae883a1462c4c0720c8e5255a005fbc82b | status: complete
 2026-09-27 | task: security hardening — HMAC signing + CSP headers + rate limit | safe-point: 8c78077f455ff379d0a3edfeedab168d4fe7274f | status: complete
 2026-09-27 | task: fix admin account rate limits + combined require_auth decorator | safe-point: 9ae0d649394dff5372b63d1323bc1fe3660ca6e3 | status: complete
 2026-09-27 | task: restructure into middleware/ folder (4 files) | safe-point: 9ae0d649394dff5372b63d1323bc1fe3660ca6e3 | status: complete

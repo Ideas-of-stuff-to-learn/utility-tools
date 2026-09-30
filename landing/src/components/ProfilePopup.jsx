@@ -40,6 +40,12 @@ export default function ProfilePopup({ onClose }) {
         ? 'https://ideas-of-stuff-to-learn.github.io/utility-tools/admin/'
         : `http://localhost:${import.meta.env.VITE_ADMIN_PORT || '5175'}/`;
 
+    const billingData = userRole?.billing;
+    const billingTier = billingData?.tier || 'base';
+    const activeTrial = billingData?.active_trial;
+    const hasPro = billingTier === 'pro' || !!activeTrial;
+    const cashflowUrl = import.meta.env.DEV ? 'http://localhost:5173' : '/utility-tools/cashflow/';
+
     return (
         <div className="profile-popup" ref={popupRef}>
             <div className="profile-popup-name">{displayName}</div>
@@ -55,6 +61,30 @@ export default function ProfilePopup({ onClose }) {
             )}
             {pendingEmail && (
                 <div className="profile-popup-pending">Pending: {pendingEmail}</div>
+            )}
+            {billingData !== undefined && (
+                <>
+                    <div className="profile-popup-divider" />
+                    <div className="profile-billing-section">
+                        <div className="profile-billing-row">
+                            <span className={`profile-tier-badge ${billingTier === 'pro' ? 'tier-pro' : 'tier-base'}`}>
+                                {billingTier === 'pro' ? '✦ Pro' : 'Base'}
+                            </span>
+                            {activeTrial && (() => {
+                                const daysLeft = Math.max(0, Math.ceil((new Date(activeTrial.ends_at) - Date.now()) / 86400000));
+                                return <span className="profile-trial-days">Trial: {daysLeft}d left</span>;
+                            })()}
+                        </div>
+                        {!hasPro && (
+                            <a
+                                className="profile-popup-btn profile-upgrade-btn"
+                                href={cashflowUrl}
+                            >
+                                {activeTrial ? 'Upgrade to Pro →' : 'Start free trial →'}
+                            </a>
+                        )}
+                    </div>
+                </>
             )}
             <div className="profile-popup-divider" />
             <button className="profile-popup-btn" onClick={handleEditProfile}>Edit Profile</button>

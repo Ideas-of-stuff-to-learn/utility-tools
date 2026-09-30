@@ -5,6 +5,7 @@ import { APP_TITLE } from '../appTitle';
 import RoleBadge from './RoleBadge';
 import ThemeToggle from './ThemeToggle';
 import ChartFootnote from './charts/ChartFootnote';
+import TrialBanner from './TrialBanner';
 import { useIsMobile } from '../customHooks/useIsMobile';
 import { useThemeSync } from '../customHooks/useThemeSync';
 import '../styles/Layout.css';
@@ -111,6 +112,7 @@ export default function Layout() {
                 </div>
             </header>
             <div className="app-content">
+                <TrialBanner />
                 <Outlet />
             </div>
             <footer className="app-footer">

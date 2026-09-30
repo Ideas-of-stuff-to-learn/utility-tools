@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../appState';
+import { useBilling } from '../appState/BillingContext';
 import { goBackToTools } from '../customHooks/homescreen/useLogout';
 import '../styles/ProfilePopup.css';
 
 export default function ProfilePopup({ onClose }) {
     const { userRole } = useAuth();
+    const { billing, tier, hasPro, activeTrial } = useBilling();
     const navigate = useNavigate();
     const popupRef = useRef(null);
 
@@ -53,6 +55,30 @@ export default function ProfilePopup({ onClose }) {
             )}
             {pendingEmail && (
                 <div className="profile-popup-pending">Pending: {pendingEmail}</div>
+            )}
+            {billing !== null && (
+                <>
+                    <div className="profile-popup-divider" />
+                    <div className="profile-billing-section">
+                        <div className="profile-billing-row">
+                            <span className={`profile-tier-badge ${tier === 'pro' ? 'tier-pro' : 'tier-base'}`}>
+                                {tier === 'pro' ? '✦ Pro' : 'Base'}
+                            </span>
+                            {activeTrial && (() => {
+                                const daysLeft = Math.max(0, Math.ceil((new Date(activeTrial.ends_at) - Date.now()) / 86400000));
+                                return <span className="profile-trial-days">Trial: {daysLeft}d left</span>;
+                            })()}
+                        </div>
+                        {!hasPro && (
+                            <button
+                                className="profile-popup-btn profile-upgrade-btn"
+                                onClick={() => { onClose(); navigate('/pricing'); }}
+                            >
+                                {activeTrial ? 'Upgrade to Pro →' : 'Start free trial →'}
+                            </button>
+                        )}
+                    </div>
+                </>
             )}
             <div className="profile-popup-divider" />
             <button className="profile-popup-btn" onClick={handleEditProfile}>Edit Profile</button>
