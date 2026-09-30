@@ -17,7 +17,11 @@
     position: relative;
     z-index: 1;
     overflow: hidden;
-    padding-bottom: 50px;
+    padding-bottom: 56px;
+}
+
+.dashboard-home-box.has-upload-content {
+    overflow-y: auto;
 }
 
 .dashboard-home-box .btn {

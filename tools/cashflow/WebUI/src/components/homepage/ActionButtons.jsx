@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBilling } from '../../appState/BillingContext';
+import { useUploadSession } from '../../appState/UploadSessionContext';
+import ProgressBar from './ProgressBar';
 
 // Shared button cluster used identically by both HomeScreen and
 // Dashboard - editing wording/order here updates both places at once.
@@ -21,6 +23,7 @@ export default function ActionButtons({
 }) {
     const navigate = useNavigate();
     const { hasPro, uploadCapReached, uploadCap, uploadsToday, uploadFilesPerAction } = useBilling();
+    const { setError: clearError, setSelectedFiles: clearFiles, setStatus: clearStatus } = useUploadSession();
     const [showLogoutWarn, setShowLogoutWarn] = useState(false);
 
     function onBackToTools() {
@@ -98,6 +101,23 @@ export default function ActionButtons({
                 <button className="btn" onClick={pickFiles} disabled={loading || categorising}>
                     Choose CSV or Excel Files
                 </button>
+            )}
+
+            {selectedFiles.length > 0 && (
+                <div className="action-file-list">
+                    {selectedFiles.map((f, i) => (
+                        <p key={f.name || i} className="action-file-name">{f.name}</p>
+                    ))}
+                </div>
+            )}
+            {(loading || status) && <ProgressBar progress={progress} status={status} />}
+            {error && (
+                <div className="action-error-wrap">
+                    <p className="action-error">{error}</p>
+                    {!loading && (
+                        <button className="action-error-dismiss" onClick={() => { clearError(null); clearFiles([]); clearStatus(null); }}>✕ Dismiss</button>
+                    )}
+                </div>
             )}
 
             <button

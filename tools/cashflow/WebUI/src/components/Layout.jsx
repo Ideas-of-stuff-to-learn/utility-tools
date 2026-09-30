@@ -7,7 +7,6 @@ import ThemeToggle from './ThemeToggle';
 import ChartFootnote from './charts/ChartFootnote';
 import TrialBanner from './TrialBanner';
 import BaseCapBanner from './BaseCapBanner';
-import UploadStatusPopup from './UploadStatusPopup';
 import { useIsMobile } from '../customHooks/useIsMobile';
 import { useThemeSync } from '../customHooks/useThemeSync';
 import '../styles/Layout.css';
@@ -124,7 +123,6 @@ export default function Layout() {
                 <Link to="/accessibility">Accessibility</Link>
                 <Link to="/cookies">Cookies</Link>
             </footer>
-            <UploadStatusPopup />
             {showInfo && <TransactionsInfoModal onClose={() => setShowInfo(false)} />}
             {showFootnote && <FootnoteModal onClose={() => setShowFootnote(false)} />}
         </div>

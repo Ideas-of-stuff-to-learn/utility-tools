@@ -604,6 +604,51 @@
     line-height: 1.4;
 }
 
+/* ── Inline action file list (shown above Automatically categorise) ──────────── */
+
+.action-file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.action-file-name {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.action-error-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.action-error {
+    font-size: 12px;
+    color: var(--danger);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.action-error-dismiss {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-align: left;
+    text-decoration: underline;
+}
+
+.action-error-dismiss:hover {
+    color: var(--text-primary);
+}
+
 /* ── Logout wipe warning modal option colours ────────────────────────────────── */
 
 .logout-warn-upgrade .modal-option-text {
