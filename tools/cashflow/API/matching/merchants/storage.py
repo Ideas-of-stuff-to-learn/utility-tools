@@ -132,6 +132,6 @@ def patch_merchants_category_rename(old_name, new_name):
     existing = get_global_merchants_cache()
     if existing is None:
         return
-    for merchant_name, category in existing.items():
+    for merchant_name, category in list(existing.items()):
         if category == old_name:
             existing[merchant_name] = new_name

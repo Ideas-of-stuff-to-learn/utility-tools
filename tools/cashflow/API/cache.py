@@ -13,6 +13,8 @@ This keeps the old CategoryCache interface while avoiding repeated database
 queries during cache checking.
 """
 
+import threading
+
 from checkingName import NEEDS_MANUAL_REVIEW
 from psycopg2.extras import execute_values
 
@@ -37,6 +39,12 @@ from psycopg2.extras import execute_values
 # tradeoff for cutting a full-table reload out of every request.
 _global_records_cache = {}
 _global_cache_loaded = False
+# gunicorn runs with --threads, so requests share this dict concurrently.
+# The lock makes the one-time cold load happen exactly once (a second
+# loader's clear() would empty the dict under a request already using it);
+# loops over the shared dict iterate a snapshot so a concurrent insert
+# can't raise "dictionary changed size during iteration".
+_global_cache_lock = threading.Lock()
 
 
 class CategoryCache:
@@ -94,15 +102,28 @@ class CategoryCache:
         self._pending_deletes.clear()
         self.dirty = False
 
-        if self.scope == "global" and _global_cache_loaded:
-            print(
-                f"[CategoryCache] WARM: reusing in-memory global cache "
-                f"({len(self._records_cache)} descriptions) - no DB reload",
-                flush=True,
-            )
-            self._preloaded = True
-            return
+        if self.scope == "global":
+            with _global_cache_lock:
+                if not _global_cache_loaded:
+                    self._load_records()
+                    _global_cache_loaded = True
+                    print(
+                        f"[CategoryCache] COLD LOAD: fetched global category_records "
+                        f"from Postgres ({len(self._records_cache)} descriptions)",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        f"[CategoryCache] WARM: reusing in-memory global cache "
+                        f"({len(self._records_cache)} descriptions) - no DB reload",
+                        flush=True,
+                    )
+        else:
+            self._load_records()
 
+        self._preloaded = True
+
+    def _load_records(self):
         self._records_cache.clear()
 
         with self.conn.cursor() as cur:
@@ -125,16 +146,6 @@ class CategoryCache:
                     }
                 )
 
-        if self.scope == "global":
-            _global_cache_loaded = True
-            print(
-                f"[CategoryCache] COLD LOAD: fetched global category_records "
-                f"from Postgres ({len(self._records_cache)} descriptions)",
-                flush=True,
-            )
-
-        self._preloaded = True
-
     @staticmethod
     def patch_global_category_rename(old_name, new_name):
         """Live-update every cached global record's category string in
@@ -145,8 +156,8 @@ class CategoryCache:
         backend.py) - this just brings the in-memory copy in sync with
         that same change, cheaply, without a round trip.
         """
-        for records in _global_records_cache.values():
-            for record in records:
+        for records in list(_global_records_cache.values()):
+            for record in list(records):
                 if record["category"] == old_name:
                     record["category"] = new_name
 
@@ -379,9 +390,9 @@ class CategoryCache:
 
         changed = 0
 
-        for records in self._records_cache.values():
+        for records in list(self._records_cache.values()):
 
-            for record in records:
+            for record in list(records):
 
                 if record["category"] == old_name:
                     record["category"] = new_name
@@ -405,8 +416,8 @@ class CategoryCache:
     def resolved_descriptions(self):
         resolved = {}
 
-        for description, records in self._records_cache.items():
-            categories = {r["category"] for r in records}
+        for description, records in list(self._records_cache.items()):
+            categories = {r["category"] for r in list(records)}
 
             if (
                 len(categories) == 1

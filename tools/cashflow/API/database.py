@@ -16,8 +16,19 @@ if not DATABASE_SESSION_POOLER:
 # session pooler already pools underneath this, but keeping a pool on
 # our side too avoids opening/closing a fresh connection on every
 # single request, which adds latency and isn't necessary here.
-connection_pool = pool.SimpleConnectionPool(
-    minconn=1,
+#
+# ThreadedConnectionPool (not SimpleConnectionPool) because gunicorn runs
+# with --threads (and the LLM tier already saves from a background thread):
+# concurrent getconn/putconn on the simple pool can hand one connection to
+# two requests. It never blocks — it raises PoolError when all maxconn are
+# out — so gunicorn threads + concurrent background saves must stay <= maxconn.
+#
+# minconn matters for speed: psycopg2 only KEEPS a returned connection while
+# fewer than minconn are idle, otherwise it closes it. With minconn=1, every
+# concurrent request beyond the first opened (and threw away) a fresh TLS
+# connection to the database, ~1s cross-region. 3 keeps enough warm.
+connection_pool = pool.ThreadedConnectionPool(
+    minconn=3,
     maxconn=10,
     dsn=DATABASE_SESSION_POOLER,
     sslmode='require',

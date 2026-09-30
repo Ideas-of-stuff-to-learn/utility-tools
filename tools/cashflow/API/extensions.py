@@ -98,12 +98,13 @@ def check_if_token_revoked(jwt_header, jwt_payload):
     ever reads. A signature-valid-but-revoked token is rejected here
     with the same effect as an expired one."""
     jti = jwt_payload["jti"]
-    # Two attempts: an SSL connection that went stale after a cold start
-    # raises OperationalError; it is discarded and the check retried once
-    # on a fresh connection. The finally guarantees every borrowed
-    # connection goes back to the pool — any other exception used to leak
-    # one, and a drained pool 500s every authenticated request.
-    for attempt in range(2):
+    # Up to 3 attempts: an idle SSL connection that went stale (cold start,
+    # server-side idle timeout) raises OperationalError; it is discarded and
+    # the check retried on the next connection. With several idle connections
+    # kept warm, more than one can be stale at once. The finally guarantees
+    # every borrowed connection goes back to the pool — any other exception
+    # used to leak one, and a drained pool 500s every authenticated request.
+    for attempt in range(3):
         conn = get_connection()
         discard = False
         try:
@@ -112,7 +113,7 @@ def check_if_token_revoked(jwt_header, jwt_payload):
                 return cur.fetchone() is not None
         except psycopg2.OperationalError:
             discard = True
-            if attempt == 1:
+            if attempt == 2:
                 raise
         finally:
             release_connection(conn, discard=discard)

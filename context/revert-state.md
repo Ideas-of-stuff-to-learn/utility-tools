@@ -83,3 +83,4 @@ Use `git revert` when changes have already been pushed to origin.
 2026-09-29 | task: hotfix white screen on cashflow entry (ResponsiveGate redirect lost on first mount) | safe-point: b8de3dca952d7f7295a7976af639cc7d1d6ee499 | status: complete
 2026-09-30 | task: entry URL normalised before router + deep-link restore via landing 404 | safe-point: 5197aad2ac860a82bf4e10ce30a97580a533e6aa | status: complete
 2026-09-30 | task: /auth/me in one DB round trip (was 5 sequential cross-region queries) | safe-point: cfcbd5e | status: complete
+2026-09-30 | task: backend thread safety (ThreadedConnectionPool + locked process caches) before gunicorn --threads | safe-point: a17816e | status: complete

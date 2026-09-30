@@ -1,3 +1,27 @@
+## 2026-09-30 — Backend made thread-safe (committed, NOT pushed) + agreed rollout order
+
+Owner's plan: ship the code, create a new **Frankfurt** Render service with `--workers 1 --threads 8` and every env var copied (especially `IDB_MASTER_KEY`, `JWT_SECRET_KEY`, `DATABASE_SESSION_POOLER`), send me the new URL, then I replace the hard-coded backend URL.
+
+**Order that must hold:** ship the thread-safety commit BEFORE the new service is created. Render builds from GitHub, so a service created earlier would run threads on the old non-thread-safe pool.
+
+Code changes:
+- `database.py`: `ThreadedConnectionPool`, minconn 3.
+- `cache.py`: lock plus a single cold load, and snapshot iteration.
+- `matching/merchants/cache_state.py`: locked lazy builds.
+- `extensions.py`: the revocation retry now tries up to 3 connections.
+
+Verified with a stubbed-DB concurrency test, 8/8:
+- 12 simultaneous cold starts → 1 DB load (the old code did 12).
+- Rename loops during concurrent inserts raise nothing.
+- The automaton builds once.
+- Stale-connection retry works and returns every connection.
+
+Not done, deliberately: no semaphore around the pool. The worst case is 8 threads plus 2 background saves = 10 = maxconn.
+
+**URL hard-coded in 8 places (replace after the new service exists):** `tools/cashflow/frontendLocalConfig.jsx`, `tools/cashflow/WebUI/index.html`, `landing/src/api.js`, `landing/index.html`, `admin/src/api.js`, `tools/cashflow/NativeAppUI/localConfig.js`, `tools/cashflow/adminClI/adminCliCommon.py` (targets production on purpose, so confirm first), `.github/workflows/supabase-keep-alive.yml`. Also update the context docs that mention it. Login cookies are per backend origin, so the user must sign in once after the switch.
+
+---
+
 ## 2026-09-30 — Measured the "slow return visit" in the owner's real Chrome
 
 **Measurements (Claude in Chrome, read-only):**

@@ -40,8 +40,13 @@ It can't send HMAC/CSRF headers, so it always 401s.
 **Open: the `write_queue` IDB store's rows are never deleted.**
 Its only producer (`optimisticUpdateTransactions`) was dead code and has been removed, so nothing enqueues any more. `writeQueue.js` is still initialised by `api.jsx`.
 
-**Open: `release_connection()` returns connections without rollback.**
-Connections go back to the pool "idle in transaction". `SimpleConnectionPool` is also not thread-safe under threaded gunicorn workers.
+**Thread-safety rules for the backend (2026-09-30, before enabling `gunicorn --threads`):**
+- `database.py` uses `ThreadedConnectionPool` (minconn 3, maxconn 10). It never blocks: the 11th simultaneous `get_connection()` raises `PoolError` (a 500). Keep gunicorn `--threads` plus concurrent background saves at or below 10. The LLM tier's `_background_cache_save` thread borrows its own connection, so with `--threads 8` the worst case is exactly 10.
+- psycopg2 only keeps a returned connection while fewer than `minconn` are idle, and closes the rest. With `minconn=1`, every concurrent request beyond the first opened a fresh cross-region TLS connection (~1s). Raising minconn to 3 keeps them warm.
+- (Correction of an earlier entry here: the pool does roll back connections in a transaction on `putconn`, so "idle in transaction" was wrong.)
+- The stale-connection retry in `extensions.check_if_token_revoked` now tries up to 3 connections, because several kept-warm idle connections can be stale at once after a long idle period.
+- Shared process caches now have locks: `cache.py` (`_global_cache_lock`, one cold load) and `matching/merchants/cache_state.py` (`_cache_lock`). Loops over shared dicts iterate snapshots (`list(...)`). New shared mutable module state needs the same treatment.
+- Recommended Render Start Command: `gunicorn backend:app --workers 1 --threads 8 --timeout 120`. Free tier is 0.1 CPU / 512 MB, so one worker: extra processes duplicate the caches and add no real parallelism.
 
 **Open: rate-limit counters are `memory://` per process.**
 They reset on every deploy and differ per gunicorn worker.
