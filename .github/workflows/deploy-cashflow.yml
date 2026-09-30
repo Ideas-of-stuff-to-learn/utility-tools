@@ -3,7 +3,7 @@ name: Deploy Cashflow WebUI to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['tools/cashflow/WebUI/**']
+    paths: ['tools/cashflow/WebUI/**', 'tools/cashflow/frontendLocalConfig.jsx', 'backend-url.json', '.github/workflows/deploy-cashflow.yml']
   workflow_dispatch:
 
 permissions:

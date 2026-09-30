@@ -3,7 +3,7 @@ name: Deploy Admin Panel to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['admin/**']
+    paths: ['admin/**', 'backend-url.json', '.github/workflows/deploy-admin.yml']
   workflow_dispatch:
 
 permissions:

@@ -1,4 +1,10 @@
-## 2026-09-30 — Backend URL switched to Frankfurt (committed, NOT pushed)
+## 2026-09-30 — Deploy workflows now trigger on backend-url.json
+
+`b5ee3d4` (URL switch) fired no workflows: they only watch their own folders. Added `backend-url.json` and the workflow file itself to the `paths` of the cashflow, landing and admin deploys. Pushing this commit triggers all three. Until then, the manual "Run workflow" button works.
+
+---
+
+## 2026-09-30 — Backend URL switched to Frankfurt (pushed, but not yet deployed)
 
 `backend-url.json` and `NativeAppUI/localConfig.js` now point at `https://utility-tools-b6dj.onrender.com`. The three earlier commits (`/auth/me` single query, thread safety, URL file) are already pushed.
 

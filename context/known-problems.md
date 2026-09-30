@@ -25,6 +25,9 @@ BrowserRouter attaches its history listener in its own layout effect, which runs
 **PITFALL (fixed 2026-09-30): cashflow deep links are served by LANDING.**
 GitHub Pages only uses the site-root `404.html`, which is landing's `index.html`. A per-folder `404.html` is ignored. So a reload, restored tab or bookmark of `/utility-tools/cashflow/dashboard` loaded the landing app with no matching route: a white screen. Landing's `main.jsx` now forwards `/utility-tools/cashflow/<path>` to `/utility-tools/cashflow/?p=<path>` before rendering, and never re-forwards a URL that already has `?p`. Cashflow's `normalizeEntryUrl()` (`ResponsiveGate.jsx`, called in `main.jsx`) restores allowlisted paths. It also rewrites the root URL to `/dashboard` or `/home` before BrowserRouter starts, so entry never depends on a post-mount redirect.
 
+**PITFALL (fixed 2026-09-30): a shared file outside an app's folder didn't trigger its deploy.**
+The Pages workflows only ran for changes under their own folders, so editing the root `backend-url.json` deployed nothing and the live sites kept the old backend. `backend-url.json` (and each workflow file) is now in every deploy workflow's `paths`. Any new shared file that gets bundled into an app needs the same. All three also have a manual "Run workflow" (`workflow_dispatch`) button.
+
 **Note: deploys aren't visible for up to ~10 minutes.**
 GitHub Pages sends `Cache-Control: max-age=600` on `index.html`, and landing prefetches `/utility-tools/cashflow/`. Test a deploy with a hard refresh on the cashflow page itself, or after 10 minutes.
 
