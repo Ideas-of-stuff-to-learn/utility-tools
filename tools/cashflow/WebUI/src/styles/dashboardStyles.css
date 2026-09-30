@@ -23,11 +23,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    overflow: hidden;
-}
-
-.dashboard-home-scroll.has-upload-content {
-    overflow-y: auto;
+    /* No overflow constraint — content grows naturally and page scrolls */
 }
 
 .dashboard-home-box .btn {

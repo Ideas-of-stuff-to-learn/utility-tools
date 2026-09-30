@@ -897,8 +897,8 @@ def _send_trial_ended_email(to_email: str, name: str, tool: str):
 
 @app.route('/admin/billing/settings', methods=['GET'])
 def admin_billing_settings_get():
-    from middleware.admin_middleware import require_admin_auth
-    err = require_admin_auth('billing.view')
+    from middleware.admin_middleware import check_admin_auth
+    err = check_admin_auth('billing.view')
     if err: return err
 
     conn = get_connection()
@@ -929,9 +929,9 @@ def admin_billing_settings_get():
 
 @app.route('/admin/billing/settings', methods=['PUT'])
 def admin_billing_settings_put():
-    from middleware.admin_middleware import require_admin_auth
+    from middleware.admin_middleware import check_admin_auth
     from flask_jwt_extended import get_jwt_identity
-    err = require_admin_auth('billing.edit')
+    err = check_admin_auth('billing.edit')
     if err: return err
 
     body = request.get_json(silent=True) or {}
@@ -977,8 +977,8 @@ def admin_billing_settings_put():
 
 @app.route('/admin/billing/ip-log', methods=['GET'])
 def admin_billing_ip_log():
-    from middleware.admin_middleware import require_admin_auth
-    err = require_admin_auth('billing.view')
+    from middleware.admin_middleware import check_admin_auth
+    err = check_admin_auth('billing.view')
     if err: return err
 
     limit = min(int(request.args.get('limit', 200)), 1000)

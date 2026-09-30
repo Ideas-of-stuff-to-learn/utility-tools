@@ -114,6 +114,48 @@ def require_admin_auth(permission_key=None):
     return decorator
 
 
+def check_admin_auth(permission_key=None):
+    """Imperative auth check for routes that can't use the decorator.
+    Returns a Flask error response tuple on failure, or None on success.
+    Also sets g.admin_user_id and g.admin_token_jti on success.
+    """
+    token = request.cookies.get('admin_access_token')
+    if not token:
+        return jsonify({'error': 'Admin session required'}), 401
+    try:
+        data = decode_token(token)
+    except Exception:
+        return jsonify({'error': 'Admin session invalid or expired'}), 401
+
+    if not data.get('admin_session'):
+        return jsonify({'error': 'Admin session required'}), 401
+
+    jti = data.get('jti')
+    admin_user_id = int(data['sub'])
+
+    conn = get_connection()
+    try:
+        if jti:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM revoked_tokens WHERE jti = %s", (jti,))
+                if cur.fetchone():
+                    return jsonify({'error': 'Session revoked'}), 401
+
+        if permission_key and not admin_user_has_permission(conn, admin_user_id, permission_key):
+            return jsonify({'error': 'Not authorized'}), 403
+    finally:
+        release_connection(conn)
+
+    g.admin_user_id = admin_user_id
+    g.admin_token_jti = jti
+
+    ok, reason = verify_hmac_request(request, str(admin_user_id), jti or '')
+    if not ok:
+        return jsonify({'error': f'HMAC verification failed: {reason}'}), 401
+
+    return None
+
+
 def require_hmac(fn):
     """Standalone decorator for regular JWT-protected routes that need
     an explicit per-route HMAC check. Must be applied AFTER @jwt_required().

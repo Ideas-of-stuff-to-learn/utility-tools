@@ -607,9 +607,15 @@
 /* ── Inline action file list (shown above Automatically categorise) ──────────── */
 
 .action-file-list {
+    background: var(--bg-header-row);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 8px 10px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
+    max-height: 120px;
+    overflow-y: auto;
 }
 
 .action-file-name {
@@ -622,6 +628,10 @@
 }
 
 .action-error-wrap {
+    background: var(--bg-header-row);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 8px 10px;
     display: flex;
     flex-direction: column;
     gap: 4px;

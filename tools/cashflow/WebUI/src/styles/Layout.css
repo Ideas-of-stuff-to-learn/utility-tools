@@ -23,6 +23,12 @@ html, body {
     overflow: hidden;
 }
 
+.app-shell-locked.allow-scroll {
+    overflow-y: auto;
+    height: auto;
+    min-height: 100%;
+}
+
 .app-header {
     display: flex;
     align-items: center;

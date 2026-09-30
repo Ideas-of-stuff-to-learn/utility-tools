@@ -44,3 +44,13 @@
 .banner-text {
     color: var(--danger);
 }
+
+/* ── Modal system — available globally so any screen can show a modal ── */
+
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 1000; }
+.modal-card { background: var(--bg-page); border-radius: 12px; padding: 16px; max-height: 70vh; overflow-y: auto; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.modal-card-narrow { max-width: 380px; width: calc(100% - 32px); }
+.modal-title { font-size: clamp(18px, 5vw, 30px); font-weight: 700; margin-bottom: 4px; padding-right: 8px; }
+.modal-desc { font-size: 14px; color: var(--text-primary); margin-bottom: 2px; text-align: center; }
+.modal-option { display: flex; align-items: center; justify-content: center; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-surface); cursor: pointer; width: 100%; margin-top: 8px; }
+.modal-option-text { font-size: 14px; color: var(--primary); }

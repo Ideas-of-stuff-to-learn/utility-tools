@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { useTransactions, useProcessing, useChartFilter } from '../appState';
 import { useUploadSession } from '../appState/UploadSessionContext';
 import { useInitialLoadLogic } from '../customHooks/homescreen/useInitialLoadLogic';
@@ -13,6 +13,7 @@ import ChartWindowSection from '../components/charts/ChartWindowSection';
 import FilterPane from '../components/dashboard/FilterPane';
 import ActionButtons from '../components/homepage/ActionButtons';
 import DashboardLogoutButton from '../components/homepage/DashboardLogoutButton';
+import '../styles/shared.css';
 import '../styles/dashboardStyles.css';
 
 export default function DashboardScreen() {
@@ -26,6 +27,17 @@ export default function DashboardScreen() {
     const { selectedFiles: ctxFiles, loading: ctxLoading, error: ctxError } = useUploadSession();
     const hasUploadContent = ctxFiles.length > 0 || ctxLoading || !!ctxError;
     const notYetCategorisedCount = transactions.filter(t => t.category === NOT_YET_CATEGORISED).length;
+
+    useEffect(() => {
+        const shell = document.querySelector('.app-shell-locked');
+        if (!shell) return;
+        if (hasUploadContent) {
+            shell.classList.add('allow-scroll');
+        } else {
+            shell.classList.remove('allow-scroll');
+        }
+        return () => shell.classList.remove('allow-scroll');
+    }, [hasUploadContent]);
 
 
     const {
