@@ -41,6 +41,7 @@ import routes.health
 import routes.uploads
 import routes.preferences
 import routes.sync
+import routes.client_events
 
 if __name__ == '__main__':
     debug = os.environ.get('FLASK_ENV') == 'development'

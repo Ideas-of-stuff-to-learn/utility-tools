@@ -1,8 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { get as idbGet, put as idbPut } from '../idb/store.js';
 import { getIdbKey, getIdbUserId, getPreferences, putPreferences } from '../api';
-import { registerFlusher } from '../idb/persistence';
+import { registerHandler, enqueue, drain, getPending, whenLoaded } from '../idb/writeQueue';
 
 // ─── IDB preference keys ──────────────────────────────────────────────────
 const IDB_STORE       = 'preferences';
@@ -34,13 +34,6 @@ async function serverGet() {
         return await getPreferences();
     } catch { return null; }
 }
-async function serverPut(patch, opts) {
-    try {
-        await putPreferences(patch, opts);
-    } catch (e) {
-        console.warn('[UserPrefs] server sync failed:', e.message);
-    }
-}
 
 // ─── context ──────────────────────────────────────────────────────────────
 const UserPreferencesContext = createContext(null);
@@ -61,45 +54,23 @@ export function UserPreferencesProvider({ children }) {
     // but kept here so it survives chart remounts.
     const [sessionStackOrder, setSessionStackOrder] = useState(null);
 
-    // ── debounce ref for server sync ───────────────────────────────────────
-    const syncTimer    = useRef(null);
-    const pendingPatch = useRef({});
+    // ── server sync (durable write queue) ──────────────────────────────────
+    // Every edit is stored encrypted on disk the moment it is made and sent
+    // ~2 s later, coalesced with any further edits. The queue itself flushes
+    // when the tab hides/closes and before hard navigations (idb/persistence).
+    // If the tab is killed first, the edit is replayed after the next sign-in
+    // and re-applied over the server's copy in hydrate() below.
+    useEffect(() => registerHandler('prefs.patch', {
+        run: (patch, { keepalive }) => putPreferences(patch, { keepalive }),
+        merge: (older, newer) => ({ ...older, ...newer }),
+        delayMs: 2000,
+    }), []);
 
     function scheduleSync(patch) {
-        Object.assign(pendingPatch.current, patch);
-        if (syncTimer.current) clearTimeout(syncTimer.current);
-        syncTimer.current = setTimeout(() => {
-            const p = { ...pendingPatch.current };
-            pendingPatch.current = {};
-            serverPut(p);
-        }, 2000);
+        enqueue('prefs.patch', patch);
     }
 
-    const flushNow = useCallback((opts) => {
-        if (syncTimer.current) {
-            clearTimeout(syncTimer.current);
-            syncTimer.current = null;
-        }
-        const p = { ...pendingPatch.current };
-        pendingPatch.current = {};
-        if (Object.keys(p).length > 0) return serverPut(p, opts);
-        return Promise.resolve();
-    }, []);
-
-    // Hard navigations await this (idb/persistence.flushAll); tab close /
-    // backgrounding falls back to a keepalive request that outlives the page.
-    useEffect(() => registerFlusher(() => flushNow({ keepalive: true })), [flushNow]);
-    useEffect(() => {
-        function onHide() {
-            if (document.visibilityState === 'hidden') flushNow({ keepalive: true });
-        }
-        document.addEventListener('visibilitychange', onHide);
-        window.addEventListener('pagehide', onHide);
-        return () => {
-            document.removeEventListener('visibilitychange', onHide);
-            window.removeEventListener('pagehide', onHide);
-        };
-    }, [flushNow]);
+    const flushNow = useCallback(() => drain({ force: true, keepalive: true }), []);
 
     // ── hydrate on login ───────────────────────────────────────────────────
     // Gated on idbReady, never on a hint: until /auth/me has returned, the
@@ -135,26 +106,55 @@ export function UserPreferencesProvider({ children }) {
 
             // Step 2 — server (authoritative)
             const remote = await remotePromise;
-            if (cancelled || !remote) return;
-            if (remote.columnWidthsDesktop) {
-                _setColWidthsDesktop(remote.columnWidthsDesktop);
-                idbWritePref(K_COL_DESKTOP, remote.columnWidthsDesktop);
+            if (cancelled) return;
+            if (remote) {
+                if (remote.columnWidthsDesktop) {
+                    _setColWidthsDesktop(remote.columnWidthsDesktop);
+                    idbWritePref(K_COL_DESKTOP, remote.columnWidthsDesktop);
+                }
+                if (remote.columnWidthsMobile) {
+                    _setColWidthsMobile(remote.columnWidthsMobile);
+                    idbWritePref(K_COL_MOBILE, remote.columnWidthsMobile);
+                }
+                if (remote.stackOrder) {
+                    _setStackOrder(remote.stackOrder);
+                    idbWritePref(K_STACK_ORDER, remote.stackOrder);
+                }
+                if (remote.stackPersist != null) {
+                    _setStackPersist(remote.stackPersist);
+                    idbWritePref(K_STACK_PERSIST, remote.stackPersist);
+                }
+                if (remote.mrPicks) {
+                    _setMrPicks(remote.mrPicks);
+                    idbWritePref(K_MR_PICKS, remote.mrPicks);
+                }
             }
-            if (remote.columnWidthsMobile) {
-                _setColWidthsMobile(remote.columnWidthsMobile);
-                idbWritePref(K_COL_MOBILE, remote.columnWidthsMobile);
+
+            // Step 3 — edits the server has not confirmed yet (made before a
+            // refresh or a killed tab, or since this load began) are newer than
+            // its copy, so they win. The queue is already sending them.
+            await whenLoaded();
+            if (cancelled) return;
+            const pending = Object.assign({}, ...getPending('prefs.patch'));
+            if ('columnWidthsDesktop' in pending) {
+                _setColWidthsDesktop(pending.columnWidthsDesktop ?? {});
+                idbWritePref(K_COL_DESKTOP, pending.columnWidthsDesktop ?? {});
             }
-            if (remote.stackOrder) {
-                _setStackOrder(remote.stackOrder);
-                idbWritePref(K_STACK_ORDER, remote.stackOrder);
+            if ('columnWidthsMobile' in pending) {
+                _setColWidthsMobile(pending.columnWidthsMobile ?? {});
+                idbWritePref(K_COL_MOBILE, pending.columnWidthsMobile ?? {});
             }
-            if (remote.stackPersist != null) {
-                _setStackPersist(remote.stackPersist);
-                idbWritePref(K_STACK_PERSIST, remote.stackPersist);
+            if ('stackOrder' in pending) {
+                _setStackOrder(pending.stackOrder ?? null);
+                idbWritePref(K_STACK_ORDER, pending.stackOrder ?? null);
             }
-            if (remote.mrPicks) {
-                _setMrPicks(remote.mrPicks);
-                idbWritePref(K_MR_PICKS, remote.mrPicks);
+            if ('stackPersist' in pending) {
+                _setStackPersist(pending.stackPersist ?? false);
+                idbWritePref(K_STACK_PERSIST, pending.stackPersist ?? false);
+            }
+            if ('mrPicks' in pending) {
+                _setMrPicks(pending.mrPicks ?? null);
+                idbWritePref(K_MR_PICKS, pending.mrPicks ?? null);
             }
         }
 

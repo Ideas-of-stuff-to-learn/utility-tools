@@ -14,6 +14,7 @@ import UnlockScreen from './screens/General/UnlockScreen.jsx';
 import ImpersonationLogScreen from './screens/General/ImpersonationLogScreen.jsx';
 import AuditLogScreen from './screens/General/AuditLogScreen.jsx';
 import GeoLogsScreen from './screens/General/GeoLogsScreen.jsx';
+import ClientEventsScreen from './screens/General/ClientEventsScreen.jsx';
 import CategoriesScreen from './screens/Cashflow/CategoriesScreen.jsx';
 import UserTransactionsScreen from './screens/Cashflow/UserTransactionsScreen.jsx';
 
@@ -75,6 +76,7 @@ function AdminApp({ user, onLogout, onGeoBlock }) {
                     <Route path="/general/impersonation-log" element={<ImpersonationLogScreen />} />
                     <Route path="/general/audit-log" element={<AuditLogScreen />} />
                     <Route path="/general/geo-logs" element={<GeoLogsScreen caller={caller} />} />
+                    <Route path="/general/failed-calls" element={<ClientEventsScreen />} />
                     <Route path="/cashflow/categories" element={<CategoriesScreen />} />
                     <Route path="/cashflow/user-transactions" element={<UserTransactionsScreen caller={caller} />} />
                     <Route path="*" element={<Navigate to="/general/users" replace />} />

@@ -3,9 +3,9 @@
 
 Issues that are documented but not yet fixed. Useful before starting work in an area.
 
-## Open (2026-09-30): write queue is dead code; pref edits lost if the tab is killed inside the 2 s debounce
+## Fixed (2026-09-30): write queue was dead code; preference edits lost if the tab was killed inside the 2 s debounce
 
-`idb/writeQueue.js` `enqueue`/`flush`/`drain` have no callers and the `write_queue` IDB backup only stores `{type, enqueuedAt}` (no payload, never read), so it could not replay anything. Either delete it or wire it properly before relying on it. Separately, a preference edit lives only in memory + IDB for up to 2 s before it reaches the server; pagehide/visibilitychange flush it with keepalive, but a hard kill (crash, force-quit) inside that window loses it, and the next boot lets the server value overwrite the local one. If a saved snapshot save is abandoned by the 1.5 s navigation cap it is atomic (single transaction), never half-written.
+`idb/writeQueue.js` is now a real durable queue (see handoff): entries are encrypted into `pending_ops` (IDB v2) the moment an edit is made, sent after a 2 s debounce, force-flushed on pagehide / tab hidden / before navigation / logout, retried with backoff, and replayed after the next sign-in. `UserPreferencesContext.hydrate` re-applies unsent edits over the server copy, so a kill inside the window no longer loses or reverts an edit. Still true: a browser hard-kill within a few ms of the edit, before the encrypted row commits, can lose that one edit; and unsent entries only replay for the same user on the same browser profile.
 
 ---
 

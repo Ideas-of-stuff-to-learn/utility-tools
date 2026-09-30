@@ -2,7 +2,8 @@ import {url} from '../../frontendLocalConfig'
 import { simulateColdStart, coldStartSimulatedSeconds } from '../../devConfig'
 import { UPLOAD_WINDOW_MODE, UPLOAD_WINDOW_DURATION_VALUE, UPLOAD_WINDOW_DURATION_UNIT } from './config/uploadWindowConfig';
 import { importKey } from './idb/crypto.js';
-import { clearQueue, initQueue } from './idb/writeQueue.js';
+import { initQueue, resetQueue, registerHandler, enqueue, flush as flushQueue } from './idb/writeQueue.js';
+import { reportEvent, setDiagnosticsSink, clearDiagnosticsSink } from './diagnostics.js';
 
 
 const BASE_URL = url;
@@ -30,15 +31,36 @@ async function _setIdbKey(base64Dek, userId) {
     try {
         idbCryptoKey = await importKey(base64Dek);
         idbUserId    = userId;
-        initQueue(userId, idbCryptoKey);
     } catch {
         idbCryptoKey = null;
         idbUserId    = null;
     }
+    // The queue also works without a key (in memory only), so failure reports
+    // still reach the server when IndexedDB or WebCrypto is unavailable.
+    initQueue(userId, idbCryptoKey);
+    setDiagnosticsSink(event => enqueue('client.events', { events: [event] }));
 }
 
 export function getIdbKey()    { return idbCryptoKey; }
 export function getIdbUserId() { return idbUserId; }
+
+// Failure reports are batched and delivered by the durable write queue, so
+// they survive a tab close and are retried while the server is unreachable.
+registerHandler('client.events', {
+    run: (payload, { keepalive }) => postClientEvents(payload.events, { keepalive }),
+    merge: (older, newer) => ({ events: [...older.events, ...newer.events].slice(-50) }),
+    delayMs: 5000,
+});
+
+export async function postClientEvents(events, { keepalive = false } = {}) {
+    const response = await authorizedFetch(`${BASE_URL}/client-events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ events }),
+        keepalive,
+    });
+    return parseJsonResponse(response, 'Failed to report events');
+}
 
 async function computeHmacHeaders(method, path) {
     if (!hmacSigningSecret) return {};
@@ -105,6 +127,9 @@ async function fetchWithTimeout(url, options, timeoutMs = DEFAULT_REQUEST_TIMEOU
             );
             timeoutError.isTimeout = true;
             timeoutError.elapsedMs = elapsedMs;
+            // The caller's own signal (component unmount, logout) also lands
+            // here; that is a cancellation, not a slow server.
+            timeoutError.isCancelled = !!externalSignal?.aborted;
             throw timeoutError;
         }
         throw err;
@@ -295,7 +320,7 @@ async function _buildHeaders(method, path, extra) {
 // 24 hours. Only throws "Not logged in" when the refresh token itself
 // is rejected; network/429/5xx failures during refresh throw an
 // .isTransient error instead so nobody mistakes them for a logout.
-async function authorizedFetch(url, options = {}, timeoutMs, onTiming, signal) {
+async function _authorizedFetch(url, options = {}, timeoutMs, onTiming, signal) {
     const method = (options.method || 'GET').toUpperCase();
     const path = new URL(url, 'http://x').pathname;
     await _awaitSession(path);
@@ -319,6 +344,42 @@ async function authorizedFetch(url, options = {}, timeoutMs, onTiming, signal) {
         }, timeoutMs, onTiming, signal);
     }
     return response;
+}
+
+// Failed calls are reported to admins (see diagnostics.js). Expected client
+// errors (400/404/409/422 from user actions) and session expiry (401) are not
+// failures worth an admin's attention, so only these are reported: network
+// errors, timeouts, 5xx, 429, 403 and 408, plus successes that took very long
+// (a Render cold start). The report endpoint itself is never reported.
+const SLOW_RESPONSE_MS = 10000;
+const REPORTED_STATUSES = new Set([403, 408, 429]);
+const UNREPORTED_PATHS = new Set(['/client-events']);
+
+async function authorizedFetch(url, options = {}, timeoutMs, onTiming, signal) {
+    const method = (options.method || 'GET').toUpperCase();
+    const path = new URL(url, 'http://x').pathname;
+    const startedAt = now();
+    try {
+        const response = await _authorizedFetch(url, options, timeoutMs, onTiming, signal);
+        if (!UNREPORTED_PATHS.has(path)) {
+            const duration_ms = now() - startedAt;
+            if (response.status >= 500 || REPORTED_STATUSES.has(response.status)) {
+                reportEvent({ kind: 'http_error', method, path, status: response.status, duration_ms, message: `HTTP ${response.status}` });
+            } else if (response.ok && duration_ms >= SLOW_RESPONSE_MS) {
+                reportEvent({ kind: 'slow_response', method, path, status: response.status, duration_ms, message: `answered after ${Math.round(duration_ms / 1000)}s` });
+            }
+        }
+        return response;
+    } catch (err) {
+        if (!UNREPORTED_PATHS.has(path) && !isAuthFailure(err) && !err?.isCancelled) {
+            reportEvent({
+                kind: err?.isTimeout ? 'timeout' : 'network_error',
+                method, path, status: err?.status, duration_ms: now() - startedAt,
+                message: err?.isTimeout ? `no answer after ${Math.round(err.elapsedMs)}ms` : err?.message,
+            });
+        }
+        throw err;
+    }
 }
 // Resets `color` back to `default_color` for the given category names -
 // admin-only, same scoping convention as updateCategory (applies to a
@@ -491,6 +552,10 @@ export async function logout() {
     if (refreshPromise) {
         await refreshPromise.catch(() => {});
     }
+    // Give unsent edits (preferences) one quick chance to reach the server
+    // while the session is still valid; whatever doesn't make it stays queued
+    // on disk and replays after the next sign-in. Capped so logout stays snappy.
+    await Promise.race([flushQueue().catch(() => {}), new Promise(r => setTimeout(r, 1500))]);
     await fetch(`${BASE_URL}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
@@ -499,10 +564,12 @@ export async function logout() {
     csrfAccessToken   = null;
     csrfRefreshToken  = null;
     hmacSigningSecret = null;
-    // Flush any pending write queue entries, then null the key.
     // IDB blobs stay on disk (still encrypted) — they become readable again
-    // on next login when the server re-issues the same DEK.
-    if (idbUserId) clearQueue(idbUserId);
+    // on next login when the server re-issues the same DEK. That includes any
+    // unsent queue entries: only the in-memory state is dropped here, and they
+    // are replayed after the next sign-in.
+    resetQueue();
+    clearDiagnosticsSink();
     idbCryptoKey = null;
     idbUserId    = null;
 }

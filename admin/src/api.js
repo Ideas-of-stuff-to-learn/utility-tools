@@ -385,6 +385,15 @@ export async function getGeoLogs({ userId = '', from = '', to = '', limit = 1000
     return await parseJson(r, 'Failed to fetch geo logs');
 }
 
+// ── Admin — client failure log (read-only) ────────────────────────────────────
+
+export async function getClientEvents({ hours = 168, kind = '', limit = 200, offset = 0 } = {}) {
+    const params = new URLSearchParams({ hours, limit, offset });
+    if (kind) params.set('kind', kind);
+    const r = await authFetch(`${BASE_URL}/admin/client-events?${params}`);
+    return await parseJson(r, 'Failed to fetch failed network calls');
+}
+
 // Returns {geo_blocked, message} on suspicious activity, or null if ok.
 export async function postGeoHeartbeat() {
     const r = await authFetch(`${BASE_URL}/admin/geo/heartbeat`, { method: 'POST' });

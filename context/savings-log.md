@@ -50,3 +50,4 @@ YYYY-MM-DD | task: <what was done> | SQLite queries: <N> | context docs loaded: 
 2026-09-30 | task: boot snapshot IDB read timeout | SQLite queries: 0 | context docs loaded: 1 | full repo scan avoided: yes | notes: node fake-IDB test + build
 2026-09-30 | task: IDB store hardening (timeouts, eviction, non-blocking enqueue) | SQLite queries: 0 | context docs loaded: 1 | full repo scan avoided: yes | notes: fake-IDB tests + build
 2026-09-30 | task: caveat audit; prefs hydrate parallel fetch; docs corrected | SQLite queries: 0 | context docs loaded: 2 | full repo scan avoided: yes | notes: write queue found to be dead code
+2026-09-30 | task: durable write queue + client_events log + admin Failed Network Calls tab + 1s boot timeout | SQLite queries: 0 | context docs loaded: 2 | full repo scan avoided: yes | notes: backend 32/32 real PG, queue 24/24, real-Chromium IDB 16/16, admin UI rendered vs fake API

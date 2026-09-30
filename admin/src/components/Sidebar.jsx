@@ -34,6 +34,7 @@ export default function Sidebar({ user, onLogout }) {
             {canSeeAudit  && <NavLink className="admin-nav-item" to="/general/impersonation-log">Impersonation Log</NavLink>}
             {canSeeAudit  && <NavLink className="admin-nav-item" to="/general/audit-log">Audit Log</NavLink>}
             {canSeeGeoLog && <NavLink className="admin-nav-item" to="/general/geo-logs">Geo Logs</NavLink>}
+            <NavLink className="admin-nav-item" to="/general/failed-calls">Failed Network Calls</NavLink>
 
             <div className="admin-sidebar-section">Cashflow</div>
             <NavLink className="admin-nav-item" to="/cashflow/categories">Categories</NavLink>

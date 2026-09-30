@@ -19,9 +19,13 @@
  */
 
 import { encrypt, decrypt } from './crypto.js';
+import { reportEvent } from '../diagnostics.js';
 
-const DB_VERSION = 1;
-const STORES = ['preferences', 'transactions', 'categories', 'upload_stats', 'write_queue', '_meta'];
+// v2 adds `pending_ops` (the durable write queue, keyed by entry id). The old
+// `write_queue` store is auto-increment keyed, so it can't hold replaceable
+// entries; it is left in place, unused.
+const DB_VERSION = 2;
+const STORES = ['preferences', 'transactions', 'categories', 'upload_stats', 'write_queue', '_meta', 'pending_ops'];
 
 const OPEN_TIMEOUT_MS = 5000;
 const OP_TIMEOUT_MS = 4000;
@@ -32,7 +36,10 @@ const _dbCache = new Map();
 function _withTimeout(promise, ms, what) {
   let timer;
   const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`IndexedDB ${what} timed out`)), ms);
+    timer = setTimeout(() => {
+      reportEvent({ kind: 'idb_timeout', message: `IndexedDB ${what} timed out after ${ms}ms`, duration_ms: ms });
+      reject(new Error(`IndexedDB ${what} timed out`));
+    }, ms);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
@@ -107,6 +114,24 @@ export async function get(userId, storeName, key, cryptoKey) {
     return JSON.parse(plaintext);
   } catch {
     return null;
+  }
+}
+
+// Every row in a store, decrypted. Rows that fail to decrypt or parse (a key
+// that changed, corruption) are skipped rather than failing the whole read.
+export async function getAll(userId, storeName, cryptoKey) {
+  try {
+    const db = await _openDB(_dbName(userId));
+    const rows = (await _run(db, storeName, 'readonly', tx => tx.objectStore(storeName).getAll())) ?? [];
+    const out = [];
+    for (const row of rows) {
+      try {
+        out.push({ key: row.key, value: JSON.parse(await decrypt(cryptoKey, row.value)) });
+      } catch { /* skip unreadable row */ }
+    }
+    return out;
+  } catch {
+    return [];
   }
 }
 

@@ -44,6 +44,9 @@ DISABLE_RL_SYNC_STATE        = False  # GET /sync/state
 DISABLE_RL_PREFERENCES_READ  = False  # GET /preferences
 DISABLE_RL_PREFERENCES_WRITE = False  # PUT /preferences
 
+# Client diagnostics
+DISABLE_RL_CLIENT_EVENTS     = False  # POST /client-events
+
 # Category writes
 DISABLE_RL_CATEGORY_WRITE    = False  # all category writes
 
@@ -150,6 +153,15 @@ RL_READ_PREFERENCES = _rl("200 per day", "DISABLE_RL_PREFERENCES_READ")
 
 RL_WRITE_PREFERENCES = _rl("500 per day", "DISABLE_RL_PREFERENCES_WRITE")
 # PUT /preferences. Used in: routes/preferences.py
+
+
+# ── CLIENT DIAGNOSTICS ───────────────────────────────────────────────────────
+
+RL_CLIENT_EVENTS = _rl("20 per minute; 300 per day", "DISABLE_RL_CLIENT_EVENTS")
+# POST /client-events — batched failure reports from the web app (up to 25
+# events each). The client sends at most one batch every few seconds; the cap
+# stops a misbehaving client from flooding the table.
+# Used in: routes/client_events.py
 
 
 # ── CATEGORY WRITES ──────────────────────────────────────────────────────────

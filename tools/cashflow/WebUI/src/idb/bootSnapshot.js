@@ -12,6 +12,7 @@
 
 import { encryptBytes, decryptBytes } from './crypto.js';
 import { readRecord, replaceStoreWithRecord, remove } from './store.js';
+import { reportEvent } from '../diagnostics.js';
 
 const STORE = 'transactions';
 const KEY = '__snapshot__';
@@ -25,7 +26,7 @@ const LEGACY_PREF_KEYS = ['chart_summary', 'chart_render_cache'];
 // new exposure. Checked against the real id before anything is decrypted.
 const UID_KEY = 'cashflow_idb_uid';
 
-const SNAPSHOT_TIMEOUT_MS = 2500;
+const SNAPSHOT_TIMEOUT_MS = 1000;
 
 let _prefetch = null;
 let _legacyCleaned = false;
@@ -47,15 +48,27 @@ export async function loadBootSnapshot(userId, cryptoKey) {
 
     // The snapshot is only a shortcut. If IndexedDB stalls (another tab or a
     // dead renderer holding a lock on the database), give up and let the
-    // caller load from the network instead of waiting forever.
+    // caller load from the network instead of waiting forever. The clock starts
+    // here, after /auth/me, but the read began before it, so a healthy read has
+    // long since finished.
+    const startedAt = Date.now();
     try {
         return await withTimeout((async () => {
             const record = await recordPromise;
-            if (!record?.iv || !record?.data) return null;
+            if (!record?.iv || !record?.data) return null;   // first visit / nothing saved: normal
             const snap = JSON.parse(await decryptBytes(cryptoKey, record.iv, record.data));
-            return snap?.v === SNAPSHOT_VERSION ? snap : null;
+            if (snap?.v !== SNAPSHOT_VERSION) return null;   // older format: normal after an upgrade
+            return snap;
         })(), SNAPSHOT_TIMEOUT_MS);
-    } catch {
+    } catch (err) {
+        // Not normal: report it so admins can see boots that fell back to the network.
+        reportEvent({
+            kind: 'boot_fallback',
+            message: err?.message === 'snapshot read timed out'
+                ? `local snapshot read timed out after ${SNAPSHOT_TIMEOUT_MS}ms - loaded from the network`
+                : `local snapshot unreadable (${err?.name || 'error'}) - loaded from the network`,
+            duration_ms: Date.now() - startedAt,
+        });
         return null;
     }
 }
