@@ -37,16 +37,13 @@ export async function enqueue(op) {
   op.optimisticFn?.();
   _queue.push(op);
 
-  // Persist to IDB as durable backup (best-effort, not required for correctness)
+  // Persist to IDB as durable backup (best-effort, not required for correctness).
+  // Not awaited: a stalled IndexedDB must never delay the server sync.
   if (_userId && _cryptoKey) {
-    try {
-      await put(_userId, 'write_queue', `q-${Date.now()}-${Math.random()}`, {
-        type: op.type,
-        enqueuedAt: Date.now(),
-      }, _cryptoKey);
-    } catch {
-      // Non-fatal — in-memory queue still has the entry
-    }
+    put(_userId, 'write_queue', `q-${Date.now()}-${Math.random()}`, {
+      type: op.type,
+      enqueuedAt: Date.now(),
+    }, _cryptoKey).catch(() => {}); // non-fatal — in-memory queue still has the entry
   }
 
   drain();

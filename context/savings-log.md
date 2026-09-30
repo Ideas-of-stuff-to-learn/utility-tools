@@ -48,3 +48,4 @@ YYYY-MM-DD | task: <what was done> | SQLite queries: <N> | context docs loaded: 
 2026-09-30 | task: backend thread safety before gunicorn --threads (ThreadedConnectionPool, locked process caches, retry x3) | SQLite queries: 0 | context docs loaded: 0 (in-session) | full repo scan avoided: yes | verified psycopg2 pool source (minconn keep-warm gotcha), concurrency test 8/8, old code fails the same test
 2026-09-30 | task: rename hardening (prefs follow category changes) tested on throwaway Postgres | SQLite queries: 0 | context docs loaded: 2 | full repo scan avoided: yes | notes: 21/21 e2e
 2026-09-30 | task: boot snapshot IDB read timeout | SQLite queries: 0 | context docs loaded: 1 | full repo scan avoided: yes | notes: node fake-IDB test + build
+2026-09-30 | task: IDB store hardening (timeouts, eviction, non-blocking enqueue) | SQLite queries: 0 | context docs loaded: 1 | full repo scan avoided: yes | notes: fake-IDB tests + build

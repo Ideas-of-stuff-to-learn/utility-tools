@@ -8,6 +8,12 @@
 
 ---
 
+## 2026-09-30 — IndexedDB layer can no longer hang (store.js hardening)
+
+Audit found no app code that holds a transaction open (all are single-request, no awaits inside), and the owner's DB was tiny (~0.5 MB) with no Chrome LOG errors, so the stall was most likely a lock leaked by a frozen renderer. Made the layer robust anyway in `idb/store.js`: `_openDB` times out at 5 s, never caches a failed/timed-out open, closes and evicts on `versionchange`/`close` (a future DB_VERSION bump would previously have blocked forever); every transaction goes through `_run` with a 4 s timeout and settles on complete/error/abort; `clearAll` closes its own connection before `deleteDatabase`. Timed-out ops return null/false exactly as the old catch paths did. `writeQueue.enqueue` no longer awaits the IDB backup put, so a stalled IDB cannot delay syncing an edit to the server (this was the worst latent consequence). Tested with a fake IDB (stalled tx, stalled open then recovery, versionchange, healthy round trip) and a clean build. `clearAll` is still not called anywhere (logout only clears the write queue): unchanged, noted.
+
+---
+
 ## 2026-09-30 — Boot snapshot read has a 2.5 s timeout
 
 `idb/bootSnapshot.js` `loadBootSnapshot` now races the IndexedDB read + decrypt against 2.5 s. If IDB stalls (a lock left by another tab or a frozen renderer on `cashflow-db-<id>`), it returns null and the dashboard loads from the network instead of showing "Loading your charts…" forever. Found in the owner's Chrome profile: opening the DB worked but a plain read never completed, while a fresh DB was instant. Tested with a fake IDB (healthy read 3 ms, stalled read null at 2.5 s) and a clean build. To confirm on prod: the same stuck profile should now draw the chart ~2.5 s later than normal.
