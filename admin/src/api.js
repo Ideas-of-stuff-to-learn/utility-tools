@@ -26,6 +26,9 @@ async function _setIdbKey(base64Dek, adminUserId) {
         // then write the admin user id as a stable preference entry.
         const { put } = await import('./idb/store.js');
         await put(adminUserId, 'preferences', 'admin_user_id', adminUserId, _idbCryptoKey);
+        // Init the durable write queue for this session.
+        const { initQueue } = await import('./idb/writeQueue.js');
+        await initQueue(adminUserId, _idbCryptoKey);
     } catch (e) {
         console.warn('[AdminIDB] key import failed:', e.message);
     }
@@ -155,12 +158,22 @@ export async function logout() {
         credentials: 'include',
         headers: { 'X-CSRF-TOKEN': csrfAdminAccess },
     }).catch(() => {});
+    // Flush any pending queue entries before clearing state.
+    try {
+        const { flush } = await import('./idb/writeQueue.js');
+        await Promise.race([flush(), new Promise(r => setTimeout(r, 1500))]);
+    } catch {}
     csrfAdminAccess   = null;
     csrfAdminRefresh  = null;
     hmacSigningSecret = null;
-    // Null the IDB key so encrypted blobs are unreadable until next login
+    // Null the IDB key so encrypted blobs are unreadable until next login.
+    // In-memory queue state is cleared; encrypted rows stay on disk for replay.
     _idbCryptoKey    = null;
     _idbAdminUserId  = null;
+    try {
+        const { resetQueue } = await import('./idb/writeQueue.js');
+        resetQueue();
+    } catch {}
 }
 
 export async function getMe() {
