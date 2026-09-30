@@ -122,7 +122,7 @@ export default function ActionButtons({
                 Go to Transactions
             </button>
 
-            <div style={{ marginTop: 'auto' }}>
+            <div className="logout-btn-anchor">
                 <button className="logout-btn" onClick={onBackToTools}>
                     ← Back to Tools
                 </button>

@@ -17,6 +17,14 @@
     position: relative;
     z-index: 1;
     overflow: hidden;
+    padding-bottom: 50px;
+}
+
+.logout-btn-anchor {
+    position: absolute;
+    bottom: 8px;
+    left: 0;
+    right: 0;
 }
 
 .dashboard-main {
