@@ -17,6 +17,18 @@ Pushing this commit triggers `deploy-all.yml` (it edits `backend-url.json`). Aft
 
 ---
 
+## 2026-09-30 — Read-only browser QA round + theme-sync loop fix (committed, NOT pushed)
+
+Four read-only testers ran in the owner's Chrome (landing/auth/timing, desktop features, phone/resize, admin/API). The phone/resize tester failed (Chrome's `resize_window` doesn't work with several testers sharing one browser) and was re-run using an iframe of controlled width instead; its result is pending.
+
+**Bug found (Tester A and B, confirmed):** `useThemeSync` fired ~13-14 parallel `PATCH /categories` on every dashboard load, mostly 429. The `appliedChartTheme` localStorage flag was missing, and the flag was only set on full success, so once the 20/day category-write limit was hit it never got set and the burst repeated every load, burning the quota real category edits need. Fix in `customHooks/useThemeSync.js`: send only categories whose colour differs from the palette (steady state = zero requests), one at a time, stop at first failure, don't retry within the browser session (`sessionStorage chartThemeSyncTried`), skip users without `categories.recolor` (or owner). Build passes; not live-verified in a browser.
+
+Side effect to know: the testers' loads triggered this sync, so up to 20 category-colour writes (same palette values) may have hit the DB today.
+
+Other findings (not fixed): category picker modal isn't dismissible with Escape and has no close button; Year view clips the top totals for 2022/2023; "Accomodation" misspelled throughout; page `<title>` is "webui-temp"; Data Security copy is missing spaces in three places; double scrollbars on /contents; `/health` warm-up fetch is opaque. Backend and static headers, unauthenticated probes and admin login screen were clean.
+
+---
+
 ## 2026-09-30 — Backend URL switched to Frankfurt (pushed, but not yet deployed)
 
 `backend-url.json` and `NativeAppUI/localConfig.js` now point at `https://utility-tools-b6dj.onrender.com`. The three earlier commits (`/auth/me` single query, thread safety, URL file) are already pushed.
