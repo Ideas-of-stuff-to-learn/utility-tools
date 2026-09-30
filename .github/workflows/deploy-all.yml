@@ -1,0 +1,43 @@
+name: Deploy All Sites to GitHub Pages
+
+# Manual: Actions tab -> "Deploy All Sites to GitHub Pages" -> Run workflow.
+# Also runs automatically when backend-url.json changes, because that file is
+# bundled into all three sites. (The per-site workflows deliberately do NOT
+# watch it, so one change doesn't queue duplicate runs.)
+#
+# The three sites build in parallel; _publish-site.yml makes their pushes to
+# gh-pages race-safe, so none of them can be cancelled or fail on a collision.
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend-url.json']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  landing:
+    uses: ./.github/workflows/_publish-site.yml
+    with:
+      site: landing
+      workdir: landing
+      dest: .
+      spa_404: true
+
+  cashflow:
+    uses: ./.github/workflows/_publish-site.yml
+    with:
+      site: cashflow
+      workdir: tools/cashflow/WebUI
+      dest: cashflow
+      local_dev: ${{ vars.VITE_LOCAL_DEV }}
+
+  admin:
+    uses: ./.github/workflows/_publish-site.yml
+    with:
+      site: admin
+      workdir: admin
+      dest: admin
+      spa_404: true

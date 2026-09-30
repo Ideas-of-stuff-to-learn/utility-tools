@@ -1,4 +1,17 @@
-## 2026-09-30 — Deploy workflows now trigger on backend-url.json
+## 2026-09-30 — Race-safe Pages deploys: 3 separate workflows + deploy-all (committed, NOT pushed)
+
+The three Pages workflows raced: one push queued three runs in one concurrency group, and GitHub keeps only one pending run, so one was cancelled. New layout in `.github/workflows/`:
+- `_publish-site.yml` (reusable): build one site, then publish to its own gh-pages folder with a fetch, re-apply and push retry loop (8 attempts). Same-site runs serialised via `publish-<site>`.
+- `deploy-landing.yml`, `deploy-cashflow.yml`, `deploy-admin.yml`: thin callers, each watching only its own folder, each with a manual button.
+- `deploy-all.yml`: runs the three in parallel, manually or when `backend-url.json` changes.
+
+Verified: YAML valid for all seven workflows; the publish script was extracted from the YAML and run three at once against a local bare repo (real push collisions retried, all sites landed, unrelated files and `.nojekyll` kept). Not verified: the actual GitHub run, and the "nothing new to publish" exit.
+
+Pushing this commit triggers `deploy-all.yml` (it edits `backend-url.json`). After that run, the sites call the Frankfurt backend; then: hard refresh, sign in once, and ask me to re-run the timing test.
+
+---
+
+## 2026-09-30 — (superseded) Deploy workflows now trigger on backend-url.json
 
 `b5ee3d4` (URL switch) fired no workflows: they only watch their own folders. Added `backend-url.json` and the workflow file itself to the `paths` of the cashflow, landing and admin deploys. Pushing this commit triggers all three. Until then, the manual "Run workflow" button works.
 

@@ -1,4 +1,4 @@
 {
-  "_comment": "Single source of truth for the production backend URL. Read by cashflow, landing, admin (Vite builds + index.html warm-up ping), the admin CLI and the keep-alive workflow. Editing this file triggers the cashflow/landing/admin deploy workflows. NativeAppUI/localConfig.js is separate (Metro can't import from here) - update it too.",
+  "_comment": "Single source of truth for the production backend URL. Read by cashflow, landing, admin (Vite builds + index.html warm-up ping), the admin CLI and the keep-alive workflow. Editing this file triggers .github/workflows/deploy-all.yml, which rebuilds and publishes all three sites (race-safe). NativeAppUI/localConfig.js is separate (Metro can't import from here) - update it too.",
   "url": "https://utility-tools-b6dj.onrender.com"
 }

@@ -1,0 +1,104 @@
+name: Publish site (reusable)
+
+# Shared by deploy-landing / deploy-cashflow / deploy-admin / deploy-all.
+# Not run directly (no push or manual trigger of its own).
+#
+# Race protection: every site lives in its own folder on the gh-pages branch,
+# so concurrent runs never touch the same files. If two runs push at the same
+# moment, the loser re-fetches gh-pages, re-applies ONLY its own folder and
+# pushes again (up to 8 times). No run waits on another and none is cancelled
+# (a concurrency group can't do that: GitHub keeps one pending run per group
+# and silently cancels the rest).
+#
+# Runs of the SAME site are serialised, because two builds of one site must
+# publish in commit order. Different sites don't block each other.
+
+on:
+  workflow_call:
+    inputs:
+      site:
+        description: Short site name (landing | cashflow | admin)
+        type: string
+        required: true
+      workdir:
+        description: Folder containing the Vite app
+        type: string
+        required: true
+      dest:
+        description: Folder on gh-pages ("." for the site root)
+        type: string
+        required: true
+      spa_404:
+        description: Copy index.html to 404.html for SPA routing
+        type: boolean
+        default: false
+      local_dev:
+        description: Value for VITE_LOCAL_DEV (cashflow only)
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: publish-${{ inputs.site }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.workdir }}
+        run: npm install
+
+      - name: Build
+        working-directory: ${{ inputs.workdir }}
+        env:
+          VITE_LOCAL_DEV: ${{ inputs.local_dev }}
+        run: npm run build
+
+      - name: Copy index.html to 404.html for SPA routing
+        if: inputs.spa_404
+        run: cp "${{ inputs.workdir }}/dist/index.html" "${{ inputs.workdir }}/dist/404.html"
+
+      - name: Publish to gh-pages (retries if another site pushes first)
+        env:
+          SITE: ${{ inputs.site }}
+          DEST: ${{ inputs.dest }}
+          DIST: ${{ github.workspace }}/${{ inputs.workdir }}/dist
+          REMOTE_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+        run: |
+          set -euo pipefail
+          git clone --quiet --branch gh-pages --single-branch "$REMOTE_URL" pages
+          cd pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3 4 5 6 7 8; do
+            git fetch --quiet origin gh-pages
+            git reset --quiet --hard origin/gh-pages
+            mkdir -p "$DEST"
+            cp -r "$DIST"/. "$DEST"/
+            touch .nojekyll
+            git add -A
+            if git diff --cached --quiet; then
+              echo "Nothing new to publish for $SITE"
+              exit 0
+            fi
+            git commit --quiet -m "Deploy $SITE from ${GITHUB_SHA::7}"
+            if git push --quiet origin HEAD:gh-pages; then
+              echo "Published $SITE on attempt $attempt"
+              exit 0
+            fi
+            echo "Push raced with another deploy (attempt $attempt), retrying..."
+            sleep $((attempt * 2))
+          done
+          echo "Could not publish $SITE after 8 attempts"
+          exit 1

@@ -3,45 +3,17 @@ name: Deploy Admin Panel to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['admin/**', 'backend-url.json', '.github/workflows/deploy-admin.yml']
+    paths: ['admin/**']
   workflow_dispatch:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
-
-concurrency:
-  group: gh-pages-deploy
-  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install dependencies
-        working-directory: admin
-        run: npm install
-
-      - name: Build
-        working-directory: admin
-        run: npm run build
-
-      - name: Copy index.html to 404.html for SPA routing
-        run: cp admin/dist/index.html admin/dist/404.html
-
-      - name: Deploy to GitHub Pages (admin/)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: admin/dist
-          destination_dir: admin
-          keep_files: true
+  deploy:
+    uses: ./.github/workflows/_publish-site.yml
+    with:
+      site: admin
+      workdir: admin
+      dest: admin
+      spa_404: true

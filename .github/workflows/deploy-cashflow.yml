@@ -3,44 +3,17 @@ name: Deploy Cashflow WebUI to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['tools/cashflow/WebUI/**', 'tools/cashflow/frontendLocalConfig.jsx', 'backend-url.json', '.github/workflows/deploy-cashflow.yml']
+    paths: ['tools/cashflow/WebUI/**', 'tools/cashflow/frontendLocalConfig.jsx']
   workflow_dispatch:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
-
-concurrency:
-  group: gh-pages-deploy
-  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install dependencies
-        working-directory: tools/cashflow/WebUI
-        run: npm install
-
-      - name: Build
-        working-directory: tools/cashflow/WebUI
-        env:
-          VITE_LOCAL_DEV: ${{ vars.VITE_LOCAL_DEV }}
-        run: npm run build
-
-      - name: Deploy to GitHub Pages (cashflow/ subdirectory)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: tools/cashflow/WebUI/dist
-          destination_dir: cashflow
-          keep_files: true
+  deploy:
+    uses: ./.github/workflows/_publish-site.yml
+    with:
+      site: cashflow
+      workdir: tools/cashflow/WebUI
+      dest: cashflow
+      local_dev: ${{ vars.VITE_LOCAL_DEV }}
