@@ -1,6 +1,122 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>(function () {
+  var BUILD = "50c326182d94";
+  var VERSION_URL = "/utility-tools/version.json";
+  var RELOAD_KEY = 'vc:reloaded-for';
+  var ASSET_KEY = 'vc:asset-reload-at';
+  var CHECK_MIN_GAP_MS = 15000;
+  var POLL_MS = 600000;
+  var BOOT_DELAY_MS = 3000;
+  var FLUSH_CAP_MS = 1700;
+  var checking = false, lastCheck = 0, latest = null, dismissedFor = null, banner = null;
+
+  function getKey(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+  function setKey(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
+  function delKey(k) { try { sessionStorage.removeItem(k); } catch (e) {} }
+
+  // Never yank the page away from someone mid-task.
+  function safeToReload() {
+    try {
+      var guards = window.__versionGuards || [];
+      for (var i = 0; i < guards.length; i++) { if (guards[i]() === false) return false; }
+      var fields = document.querySelectorAll('input, textarea');
+      for (var j = 0; j < fields.length; j++) {
+        var f = fields[j], t = (f.type || 'text').toLowerCase();
+        if (f.readOnly || f.disabled) continue;
+        if (t === 'file') { if (f.files && f.files.length) return false; continue; }
+        if (t === 'hidden' || t === 'checkbox' || t === 'radio' || t === 'range' || t === 'button' || t === 'submit' || t === 'color') continue;
+        if (f.value) return false;
+      }
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function reload(forBuild) {
+    setKey(RELOAD_KEY, forBuild || '');
+    var done = false;
+    function go() { if (done) return; done = true; location.reload(); }
+    try {
+      var p = window.__versionFlush && window.__versionFlush();
+      if (p && p.then) { p.then(go, go); setTimeout(go, FLUSH_CAP_MS); return; }
+    } catch (e) {}
+    go();
+  }
+
+  function hideBanner() { if (banner && banner.parentNode) banner.parentNode.removeChild(banner); banner = null; }
+
+  function showBanner() {
+    if (banner || dismissedFor === latest) return;
+    if (!document.body) { document.addEventListener('DOMContentLoaded', showBanner); return; }
+    banner = document.createElement('div');
+    banner.setAttribute('role', 'status');
+    banner.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:2147483000;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:10px 14px;border-radius:999px;background:#1f2430;color:#fff;font:500 14px/1.3 system-ui,-apple-system,Segoe UI,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.35)';
+    var msg = document.createElement('span');
+    msg.textContent = 'A new version is available.';
+    var go = document.createElement('button');
+    go.type = 'button'; go.textContent = 'Reload';
+    go.style.cssText = 'border:0;border-radius:999px;padding:6px 12px;background:#fff;color:#1f2430;font:600 13px system-ui,sans-serif;cursor:pointer';
+    go.onclick = function () { reload(latest); };
+    var x = document.createElement('button');
+    x.type = 'button'; x.setAttribute('aria-label', 'Dismiss'); x.textContent = '\u00d7';
+    x.style.cssText = 'border:0;background:transparent;color:#fff;font:400 18px/1 system-ui,sans-serif;cursor:pointer;padding:0 2px';
+    x.onclick = function () { dismissedFor = latest; hideBanner(); };
+    banner.appendChild(msg); banner.appendChild(go); banner.appendChild(x);
+    document.body.appendChild(banner);
+  }
+
+  function onNewBuild(newBuild) {
+    latest = newBuild;
+    // Already reloaded for this build and still old: a stale copy is being
+    // served. Do not loop; let the person decide.
+    if (getKey(RELOAD_KEY) === newBuild) { showBanner(); return; }
+    if (document.hidden && safeToReload()) { reload(newBuild); return; }
+    showBanner();
+  }
+
+  function check(force) {
+    var now = Date.now();
+    if (checking || (!force && now - lastCheck < CHECK_MIN_GAP_MS)) return;
+    checking = true; lastCheck = now;
+    fetch(VERSION_URL + '?t=' + now, { cache: 'no-store', credentials: 'omit' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !j.build) return;
+        if (j.build === BUILD) { delKey(RELOAD_KEY); latest = null; hideBanner(); }
+        else onNewBuild(j.build);
+      })
+      .catch(function () {})
+      .then(function () { checking = false; });
+  }
+
+  // Files of the old page that no longer exist: reload once instead of a blank screen.
+  function reloadForBrokenAsset() {
+    var last = Number(getKey(ASSET_KEY) || 0);
+    if (Date.now() - last < 60000) return;
+    setKey(ASSET_KEY, String(Date.now()));
+    reload('');
+  }
+  window.addEventListener('error', function (e) {
+    var t = e && e.target;
+    if (!t || t === window || (t.tagName !== 'SCRIPT' && t.tagName !== 'LINK')) return;
+    var src = t.src || t.href || '';
+    if (src.indexOf(location.origin) === 0 && src.indexOf('/assets/') !== -1) reloadForBrokenAsset();
+  }, true);
+  window.addEventListener('vite:preloadError', function (e) { if (e && e.preventDefault) e.preventDefault(); reloadForBrokenAsset(); });
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      if (latest && getKey(RELOAD_KEY) !== latest && safeToReload()) reload(latest);
+    } else { check(false); }
+  });
+  window.addEventListener('focus', function () { check(false); });
+  window.addEventListener('online', function () { check(false); });
+  window.addEventListener('pageshow', function (e) { if (e && e.persisted) check(true); });
+  setTimeout(function () { check(true); }, BOOT_DELAY_MS);
+  setInterval(function () { if (!document.hidden) check(false); }, POLL_MS);
+})();</script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Utility Tools</title>
