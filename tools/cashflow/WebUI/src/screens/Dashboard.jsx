@@ -12,6 +12,7 @@ import HomepageInfo from '../components/homepage/homepageInfo';
 import ChartWindowSection from '../components/charts/ChartWindowSection';
 import FilterPane from '../components/dashboard/FilterPane';
 import ActionButtons from '../components/homepage/ActionButtons';
+import DashboardLogoutButton from '../components/homepage/DashboardLogoutButton';
 import '../styles/dashboardStyles.css';
 
 export default function DashboardScreen() {
@@ -25,6 +26,7 @@ export default function DashboardScreen() {
     const { selectedFiles: ctxFiles, loading: ctxLoading, error: ctxError } = useUploadSession();
     const hasUploadContent = ctxFiles.length > 0 || ctxLoading || !!ctxError;
     const notYetCategorisedCount = transactions.filter(t => t.category === NOT_YET_CATEGORISED).length;
+
 
     const {
         hasData, effectiveOrder, updateOrder, resetOrder, persist, togglePersist, isCustomOrder,
@@ -50,23 +52,29 @@ export default function DashboardScreen() {
 
     return (
         <div className="dashboard-flex">
-            <div className={`dashboard-home-box${hasUploadContent ? ' has-upload-content' : ''}`}>
-                <HomepageInfo dateRangeInfo={dateRangeInfo} uploadBreakdown={uploadBreakdown} showTitle={false} />
-                <ActionButtons
-                    pickFiles={pickFiles}
-                    selectedFiles={selectedFiles}
-                    loading={loading}
-                    categorising={categorising}
-                    status={status}
-                    error={error}
-                    progress={progress}
-                    handleCategorisePress={categoriseSelected}
-                    notYetCategorisedCount={notYetCategorisedCount}
-                    allTransactionsLoaded={allTransactionsLoaded}
-                    handleLogout={handleLogout}
-                    duplicateNotice={duplicateNotice}
-                    onDismissDuplicateNotice={clearDuplicateNotice}
-                />
+            <div className="dashboard-home-box">
+                <div className={`dashboard-home-scroll${hasUploadContent ? ' has-upload-content' : ''}`}>
+                    <HomepageInfo dateRangeInfo={dateRangeInfo} uploadBreakdown={uploadBreakdown} showTitle={false} />
+                    <ActionButtons
+                        pickFiles={pickFiles}
+                        selectedFiles={selectedFiles}
+                        loading={loading}
+                        categorising={categorising}
+                        status={status}
+                        error={error}
+                        progress={progress}
+                        handleCategorisePress={categoriseSelected}
+                        notYetCategorisedCount={notYetCategorisedCount}
+                        allTransactionsLoaded={allTransactionsLoaded}
+                        handleLogout={handleLogout}
+                        hideLogout={true}
+                        duplicateNotice={duplicateNotice}
+                        onDismissDuplicateNotice={clearDuplicateNotice}
+                    />
+                </div>
+                <div className="dashboard-home-footer">
+                    <DashboardLogoutButton handleLogout={handleLogout} />
+                </div>
             </div>
 
             <div className="dashboard-main">

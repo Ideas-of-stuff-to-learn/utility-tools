@@ -18,6 +18,7 @@ export default function ActionButtons({
     handleCategorisePress, notYetCategorisedCount, allTransactionsLoaded,
     handleLogout,
     showGoToCharts = false,
+    hideLogout = false,
     duplicateNotice = null,
     onDismissDuplicateNotice,
 }) {
@@ -142,13 +143,15 @@ export default function ActionButtons({
                 Go to Transactions
             </button>
 
-            <div className="logout-btn-anchor">
-                <button className="logout-btn" onClick={onBackToTools}>
-                    ← Back to Tools
-                </button>
-            </div>
+            {!hideLogout && (
+                <div className="logout-btn-anchor">
+                    <button className="logout-btn" onClick={onBackToTools}>
+                        ← Back to Tools
+                    </button>
+                </div>
+            )}
 
-            {showLogoutWarn && (
+            {!hideLogout && showLogoutWarn && (
                 <div className="modal-backdrop">
                     <div className="modal-card modal-card-narrow">
                         <h1 className="modal-title" style={{ fontSize: 20, marginBottom: 12 }}>Your data will be wiped</h1>

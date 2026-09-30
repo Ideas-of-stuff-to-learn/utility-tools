@@ -13,14 +13,20 @@
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
     position: relative;
     z-index: 1;
-    overflow: hidden;
-    padding-bottom: 56px;
 }
 
-.dashboard-home-box.has-upload-content {
+.dashboard-home-scroll {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.dashboard-home-scroll.has-upload-content {
     overflow-y: auto;
 }
 
@@ -28,11 +34,9 @@
     padding-block: 8px;
 }
 
-.logout-btn-anchor {
-    position: absolute;
-    bottom: 8px;
-    left: 0;
-    right: 0;
+.dashboard-home-footer {
+    flex-shrink: 0;
+    padding-top: 4px;
 }
 
 .dashboard-main {
