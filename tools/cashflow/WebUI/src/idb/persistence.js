@@ -14,3 +14,7 @@ export async function flushAll(timeoutMs = 1500) {
     }));
     await Promise.race([work, new Promise(r => setTimeout(r, timeoutMs))]);
 }
+
+// The stale-build guard awaits this before it reloads the page for a new
+// deploy, so pending local writes get a chance to finish first.
+if (typeof window !== 'undefined') window.__versionFlush = () => flushAll(1500);

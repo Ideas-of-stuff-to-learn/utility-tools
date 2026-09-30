@@ -8,6 +8,7 @@ import { useProcessing } from './ProcessingContext';
 import { useUserPreferences } from './UserPreferencesContext';
 import { loadBootSnapshot, saveBootSnapshot } from '../idb/bootSnapshot';
 import { registerFlusher } from '../idb/persistence';
+import { addReloadGuard } from '../idb/reloadGuard';
 
 const TransactionsContext = createContext();
 
@@ -82,6 +83,9 @@ export function TransactionsProvider({ children }) {
         const processing = processingStage === 'parsing' || processingStage === 'checkingCache' || processingStage === 'waitingForLLM';
         busyRef.current = categorising || processing || !!manualReviewFlow;
     }, [categorising, processingStage, manualReviewFlow]);
+    // A deploy must never reload the page in the middle of an upload,
+    // categorisation or manual review (see shared/vite-stale-build-guard.js).
+    useEffect(() => addReloadGuard(() => !busyRef.current), []);
 
     const setTransactions = useCallback((update) => {
         localEditRef.current++;

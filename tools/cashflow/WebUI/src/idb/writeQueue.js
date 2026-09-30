@@ -31,6 +31,7 @@
 
 import { put, remove, getAll } from './store.js';
 import { registerFlusher } from './persistence.js';
+import { addReloadGuard } from './reloadGuard.js';
 import { reportEvent } from '../diagnostics.js';
 
 const STORE = 'pending_ops';
@@ -256,6 +257,9 @@ function _drop(entry, err, reason) {
 // ── automatic triggers ─────────────────────────────────────────────────────
 
 registerFlusher(() => drain({ force: true, keepalive: true }));
+
+// Don't auto-reload for a new deploy while edits are still unsent.
+addReloadGuard(() => _entries.length === 0);
 
 if (typeof window !== 'undefined') {
   window.addEventListener('focus', () => drain());

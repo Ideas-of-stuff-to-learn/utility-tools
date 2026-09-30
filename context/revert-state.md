@@ -91,3 +91,4 @@ Use `git revert` when changes have already been pushed to origin.
 2026-09-30 | task: harden idb/store.js - bounded open + per-op timeouts, versionchange/close eviction, no cached failed open | safe-point: c75c5fb | status: complete
 2026-09-30 | task: prefs hydrate starts server fetch in parallel with IDB reads; docs corrected (write queue is dead code) | safe-point: f40d02b | status: complete
 2026-09-30 | task: durable write queue (prefs), boot-fallback + failed-call logging, admin Failed network calls tab, 1s snapshot timeout, keep queue across logout | safe-point: 90bd745 | status: complete
+2026-09-30 | task: stale-build guard (version.json + inline detector, reload/pill, asset-failure reload) for landing/cashflow/admin | safe-point: c0c2831 | status: complete
