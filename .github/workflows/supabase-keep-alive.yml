@@ -71,8 +71,9 @@ jobs:
       - name: Process pending role/category deletions (48-hour grace period)
         if: steps.ping.outputs.result == 'SUCCESS'
         run: |
+          backend_url=$(jq -r .url backend-url.json)
           response=$(curl -s -w "\n%{http_code}" \
-            -X POST "https://cashflow2-0.onrender.com/internal/process-pending-deletions" \
+            -X POST "$backend_url/internal/process-pending-deletions" \
             -H "X-Cleanup-Secret: ${{ secrets.CLEANUP_SECRET }}" \
             -H "Content-Type: application/json")
 

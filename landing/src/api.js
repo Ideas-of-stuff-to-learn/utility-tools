@@ -1,5 +1,7 @@
+import backend from '../../backend-url.json';
+
 const BASE_URL = import.meta.env.PROD
-    ? 'https://cashflow2-0.onrender.com'
+    ? backend.url
     : `http://${import.meta.env.VITE_LOCAL_IP || 'localhost'}:${import.meta.env.VITE_BACKEND_PORT || '5050'}`;
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 110000;

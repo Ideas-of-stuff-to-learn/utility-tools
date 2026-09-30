@@ -14,9 +14,14 @@ Not a script itself - nothing here has a __main__ block, it's only
 meant to be imported.
 """
 
+import json
+import os
+
 import requests
 
-BASE_URL = "https://cashflow2-0.onrender.com"
+# Single source of truth for the production backend URL (repo root).
+with open(os.path.join(os.path.dirname(__file__), "..", "..", "..", "backend-url.json"), encoding="utf-8") as _f:
+    BASE_URL = json.load(_f)["url"]
 
 
 def login(username, password):

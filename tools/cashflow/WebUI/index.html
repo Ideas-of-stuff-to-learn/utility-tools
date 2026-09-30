@@ -33,7 +33,7 @@
       var h = location.hostname;
       var isLocal = h === 'localhost' || h === '127.0.0.1' || h.startsWith('192.168.') || h.startsWith('10.') || h.startsWith('172.');
       if (!isLocal) {
-        fetch('https://cashflow2-0.onrender.com/health', { method: 'GET', mode: 'no-cors', credentials: 'omit' }).catch(function(){});
+        fetch('__BACKEND_URL__/health', { method: 'GET', mode: 'no-cors', credentials: 'omit' }).catch(function(){});
       }
     </script>
     <script type="module" src="/src/main.jsx"></script>

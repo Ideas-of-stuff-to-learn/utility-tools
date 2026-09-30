@@ -18,7 +18,9 @@ Verified with a stubbed-DB concurrency test, 8/8:
 
 Not done, deliberately: no semaphore around the pool. The worst case is 8 threads plus 2 background saves = 10 = maxconn.
 
-**URL hard-coded in 8 places (replace after the new service exists):** `tools/cashflow/frontendLocalConfig.jsx`, `tools/cashflow/WebUI/index.html`, `landing/src/api.js`, `landing/index.html`, `admin/src/api.js`, `tools/cashflow/NativeAppUI/localConfig.js`, `tools/cashflow/adminClI/adminCliCommon.py` (targets production on purpose, so confirm first), `.github/workflows/supabase-keep-alive.yml`. Also update the context docs that mention it. Login cookies are per backend origin, so the user must sign in once after the switch.
+**UPDATE: backend URL is now ONE file, `backend-url.json` at the repo root.** Read by cashflow (`frontendLocalConfig.jsx`), landing and admin (`api.js`), both `index.html` warm-up pings (via a small Vite plugin replacing `__BACKEND_URL__`), the admin CLI (`adminCliCommon.py`) and the keep-alive workflow (`jq`). To move the backend: edit that one file, plus `NativeAppUI/localConfig.js` (Expo/Metro can't import files outside its folder). Builds verified for all three apps.
+
+**(Superseded list) URL was hard-coded in 8 places:** `tools/cashflow/frontendLocalConfig.jsx`, `tools/cashflow/WebUI/index.html`, `landing/src/api.js`, `landing/index.html`, `admin/src/api.js`, `tools/cashflow/NativeAppUI/localConfig.js`, `tools/cashflow/adminClI/adminCliCommon.py` (targets production on purpose, so confirm first), `.github/workflows/supabase-keep-alive.yml`. Also update the context docs that mention it. Login cookies are per backend origin, so the user must sign in once after the switch.
 
 ---
 
