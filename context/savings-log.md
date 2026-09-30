@@ -49,3 +49,4 @@ YYYY-MM-DD | task: <what was done> | SQLite queries: <N> | context docs loaded: 
 2026-09-30 | task: rename hardening (prefs follow category changes) tested on throwaway Postgres | SQLite queries: 0 | context docs loaded: 2 | full repo scan avoided: yes | notes: 21/21 e2e
 2026-09-30 | task: boot snapshot IDB read timeout | SQLite queries: 0 | context docs loaded: 1 | full repo scan avoided: yes | notes: node fake-IDB test + build
 2026-09-30 | task: IDB store hardening (timeouts, eviction, non-blocking enqueue) | SQLite queries: 0 | context docs loaded: 1 | full repo scan avoided: yes | notes: fake-IDB tests + build
+2026-09-30 | task: caveat audit; prefs hydrate parallel fetch; docs corrected | SQLite queries: 0 | context docs loaded: 2 | full repo scan avoided: yes | notes: write queue found to be dead code

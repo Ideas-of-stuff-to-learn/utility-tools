@@ -3,6 +3,12 @@
 
 Issues that are documented but not yet fixed. Useful before starting work in an area.
 
+## Open (2026-09-30): write queue is dead code; pref edits lost if the tab is killed inside the 2 s debounce
+
+`idb/writeQueue.js` `enqueue`/`flush`/`drain` have no callers and the `write_queue` IDB backup only stores `{type, enqueuedAt}` (no payload, never read), so it could not replay anything. Either delete it or wire it properly before relying on it. Separately, a preference edit lives only in memory + IDB for up to 2 s before it reaches the server; pagehide/visibilitychange flush it with keepalive, but a hard kill (crash, force-quit) inside that window loses it, and the next boot lets the server value overwrite the local one. If a saved snapshot save is abandoned by the 1.5 s navigation cap it is atomic (single transaction), never half-written.
+
+---
+
 ## Web boot / session / IDB pitfalls (2026-09-29)
 
 Read before touching `tools/cashflow/WebUI/src/api.jsx`, `appState/*`, `idb/*`, `ResponsiveGate`, or `landing/src/api.js`.

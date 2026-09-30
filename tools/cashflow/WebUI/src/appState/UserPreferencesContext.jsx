@@ -112,6 +112,11 @@ export function UserPreferencesProvider({ children }) {
         let cancelled = false;
 
         async function hydrate() {
+            // Ask the server right away, in parallel with the local read, so a
+            // slow or stalled IndexedDB never delays authoritative prefs. Local
+            // values are still applied first, then the server's on top.
+            const remotePromise = serverGet();
+
             // Step 1 — IDB (instant, best-effort)
             const [cwd, cwm, so, sp, mr] = await Promise.all([
                 idbReadPref(K_COL_DESKTOP, {}),
@@ -129,7 +134,7 @@ export function UserPreferencesProvider({ children }) {
             setLocalPrefsReady(true);
 
             // Step 2 — server (authoritative)
-            const remote = await serverGet();
+            const remote = await remotePromise;
             if (cancelled || !remote) return;
             if (remote.columnWidthsDesktop) {
                 _setColWidthsDesktop(remote.columnWidthsDesktop);
