@@ -1,4 +1,18 @@
-## 2026-09-30 — Backend made thread-safe (committed, NOT pushed) + agreed rollout order
+## 2026-09-30 — Backend URL switched to Frankfurt (committed, NOT pushed)
+
+`backend-url.json` and `NativeAppUI/localConfig.js` now point at `https://utility-tools-b6dj.onrender.com`. The three earlier commits (`/auth/me` single query, thread safety, URL file) are already pushed.
+
+Probed the new service before switching (unauthenticated only): `/health` 200 in 0.17s, `/sync/state` and `/auth/csrf` exist (401 without a session), CORS allows the Pages origin with max-age 7200. So it runs the new code.
+
+All three apps build; the cashflow production bundle embeds the new URL and none of the old.
+
+**Next:** owner says ship, waits for the Cashflow, Landing and Admin deploys, hard-refreshes, and signs in once (cookies are per backend origin; cached data survives because the key comes from the same `IDB_MASTER_KEY`). Then I re-run the timing test in their Chrome. Delete the Oregon service only after it's confirmed working. To roll back: revert this commit.
+
+**Watch:** admin CLI now targets the new service. The keep-alive workflow's cleanup call uses `backend-url.json` too. The old service's `FRONTEND_BASE_URL`-style variables were copied, so check that email links still point at the Pages site.
+
+---
+
+## 2026-09-30 — Backend made thread-safe (pushed) + agreed rollout order
 
 Owner's plan: ship the code, create a new **Frankfurt** Render service with `--workers 1 --threads 8` and every env var copied (especially `IDB_MASTER_KEY`, `JWT_SECRET_KEY`, `DATABASE_SESSION_POOLER`), send me the new URL, then I replace the hard-coded backend URL.
 

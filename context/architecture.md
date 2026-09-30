@@ -235,7 +235,7 @@ Web: StackChartCanvas (canvas 2D); RN: react-native-gifted-charts
 
 ## Admin Flow
 
-`tools/cashflow/adminClI/` — standalone Python CLI scripts. `BASE_URL` in each script hardcoded to `https://cashflow2-0.onrender.com` (production). Never run against prod without intent.
+`tools/cashflow/adminClI/` — standalone Python CLI scripts. `BASE_URL` in `adminCliCommon.py` is read from repo-root `backend-url.json` (production). Never run against prod without intent.
 
 Categories: colours/setColorAdmin.py, users/, permissions/
 

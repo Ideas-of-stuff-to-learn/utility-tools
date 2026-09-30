@@ -38,7 +38,7 @@ The core value proposition is the categorization pipeline: transactions are clas
 ## External Services
 
 - **Supabase** — hosted Postgres database
-- **Render** — backend deployment (`https://cashflow2-0.onrender.com`)
+- **Render** — backend deployment (`https://utility-tools-b6dj.onrender.com`, Frankfurt; URL lives in `backend-url.json`)
 - **Google Gemini** — LLM categorization tier
 - **GitHub Actions** — automated deploy, backup, keep-alive
 

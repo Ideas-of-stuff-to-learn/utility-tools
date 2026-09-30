@@ -52,7 +52,7 @@ Not cookies. Not localStorage.
 `App/.env` and `App/NativeAppUI/generatedLocalConfig.js` are overwritten every time the dev start script runs. Edit the templates/scripts, not the generated outputs.
 
 **Admin CLI always targets production.**
-`BASE_URL` in adminClI scripts is hardcoded to `https://cashflow2-0.onrender.com`. Run with intent. Never run bulk-delete or destructive admin operations without owner authorization.
+`BASE_URL` in adminClI scripts comes from the production URL in repo-root `backend-url.json`. Run with intent. Never run bulk-delete or destructive admin operations without owner authorization.
 
 **No automated tests.**
 There is no test suite anywhere in the project. Verification is build + visual inspection only. Do not set up a test framework without explicit instruction.

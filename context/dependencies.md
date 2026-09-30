@@ -108,7 +108,7 @@ Generated files (`App/.env`, `App/NativeAppUI/generatedLocalConfig.js`) must NOT
 ### Admin CLI → Production
 ```
 App/adminClI/*.py scripts
-  → adminCliCommon.py (BASE_URL hardcoded to https://cashflow2-0.onrender.com)
+  → adminCliCommon.py (BASE_URL read from repo-root backend-url.json)
   → Flask admin routes (production)
   → Postgres (production)
 ```

@@ -7,4 +7,4 @@ try {
     LOCAL_BASE_URL = generated.LOCAL_BASE_URL || null;
 } catch (_) {}
 
-export const BASE_URL = LOCAL_BASE_URL || 'https://cashflow2-0.onrender.com';
+export const BASE_URL = LOCAL_BASE_URL || 'https://utility-tools-b6dj.onrender.com';
