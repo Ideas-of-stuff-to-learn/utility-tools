@@ -35,9 +35,9 @@
     flex-shrink: 0;
 }
 
-.dashboard-home-scroll > .action-file-list {
+.dashboard-home-scroll > .action-file-list-slot {
     flex-shrink: 1;
-    min-height: 60px;
+    min-height: 90px;
 }
 
 .dashboard-home-box .range-text {

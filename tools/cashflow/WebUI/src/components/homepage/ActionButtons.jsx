@@ -104,19 +104,21 @@ export default function ActionButtons({
                 </button>
             )}
 
-            {selectedFiles.length > 0 && (
-                <div className="action-file-list">
-                    <div className="action-file-list-header">
-                        <span className="action-file-list-count">{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}</span>
-                        {!loading && (
-                            <button className="action-file-dismiss" onClick={() => clearFiles([])}>✕</button>
-                        )}
+            <div className="action-file-list-slot">
+                {selectedFiles.length > 0 && (
+                    <div className="action-file-list">
+                        <div className="action-file-list-header">
+                            <span className="action-file-list-count">{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}</span>
+                            {!loading && (
+                                <button className="action-file-dismiss" onClick={() => clearFiles([])}>✕</button>
+                            )}
+                        </div>
+                        {selectedFiles.map((f, i) => (
+                            <p key={f.name || i} className="action-file-name">{f.name}</p>
+                        ))}
                     </div>
-                    {selectedFiles.map((f, i) => (
-                        <p key={f.name || i} className="action-file-name">{f.name}</p>
-                    ))}
-                </div>
-            )}
+                )}
+            </div>
             {(loading || status) && <ProgressBar progress={progress} status={status} />}
             {error && (
                 <div className="action-error-wrap">
