@@ -31,8 +31,18 @@
     display: none;
 }
 
+.dashboard-home-box .range-text {
+    margin-bottom: 6px;
+    text-align: left;
+}
+
 .dashboard-home-box .btn {
     padding-block: 8px;
+    margin-bottom: 4px;
+}
+
+.dashboard-home-box .btn-secondary {
+    margin-top: 4px;
 }
 
 .dashboard-home-footer {
