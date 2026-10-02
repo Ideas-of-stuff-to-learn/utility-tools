@@ -22,7 +22,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     overflow-y: auto;
     scrollbar-width: none;
 }
@@ -37,12 +37,12 @@
 }
 
 .dashboard-home-box .btn {
-    padding-block: 8px;
-    margin-bottom: 4px;
+    padding-block: 7px;
+    margin-bottom: 0;
 }
 
 .dashboard-home-box .btn-secondary {
-    margin-top: 4px;
+    margin-top: 0;
 }
 
 .dashboard-home-footer {
