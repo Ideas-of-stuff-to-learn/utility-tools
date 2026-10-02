@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef } from 'react';
 import { useTransactions, useProcessing, useChartFilter } from '../appState';
 import { useInitialLoadLogic } from '../customHooks/homescreen/useInitialLoadLogic';
 import { useLogout } from '../customHooks/homescreen/useLogout';
@@ -7,6 +7,7 @@ import { useFileProcessor } from '../customHooks/homescreen/useFileProcessor';
 import { useChartData } from '../customHooks/charts/useChartData';
 import { useDetailedChartReveal } from '../customHooks/charts/useDetailedChartReveal';
 import { NOT_YET_CATEGORISED } from '../checkingName';
+import HomepageInfo from '../components/homepage/homepageInfo';
 import ChartWindowSection from '../components/charts/ChartWindowSection';
 import FilterPane from '../components/dashboard/FilterPane';
 import ActionButtons from '../components/homepage/ActionButtons';
@@ -15,22 +16,14 @@ import '../styles/shared.css';
 import '../styles/dashboardStyles.css';
 
 export default function DashboardScreen() {
-    const { transactions, allTransactionsLoaded, categoryColors } = useTransactions();
+    const { transactions, allTransactionsLoaded, categoryColors, uploadBreakdown } = useTransactions();
     const { categorising } = useProcessing();
     const { contentsSelectedCategories, toggleContentsCategory, toggleAllContentsCategories } = useChartFilter();
-    useInitialLoadLogic();
+    const { dateRangeInfo } = useInitialLoadLogic();
     const { handleLogout } = useLogout();
     const { pickFiles, selectedFiles, status, error } = useFilePicker();
     const { categoriseSelected, loading, progress, duplicateNotice, clearDuplicateNotice } = useFileProcessor();
     const notYetCategorisedCount = transactions.filter(t => t.category === NOT_YET_CATEGORISED).length;
-
-    useEffect(() => {
-        const shell = document.querySelector('.app-shell-locked');
-        if (!shell) return;
-        const needsScroll = selectedFiles.length > 0 || loading || !!error;
-        shell.classList.toggle('allow-scroll', needsScroll);
-        return () => shell.classList.remove('allow-scroll');
-    }, [selectedFiles.length, loading, error]);
 
 
 
@@ -60,6 +53,7 @@ export default function DashboardScreen() {
         <div className="dashboard-flex">
             <div className="dashboard-home-box">
                 <div className="dashboard-home-scroll">
+                    <HomepageInfo dateRangeInfo={dateRangeInfo} uploadBreakdown={uploadBreakdown} showTitle={false} />
                     <ActionButtons
                         pickFiles={pickFiles}
                         selectedFiles={selectedFiles}

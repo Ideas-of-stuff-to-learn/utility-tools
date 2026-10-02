@@ -614,6 +614,13 @@
     display: flex;
     flex-direction: column;
     gap: 0;
+    max-height: 140px;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+.action-file-list::-webkit-scrollbar {
+    display: none;
 }
 
 .action-file-name {
