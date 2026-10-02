@@ -106,6 +106,12 @@ export default function ActionButtons({
 
             {selectedFiles.length > 0 && (
                 <div className="action-file-list">
+                    <div className="action-file-list-header">
+                        <span className="action-file-list-count">{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}</span>
+                        {!loading && (
+                            <button className="action-file-dismiss" onClick={() => clearFiles([])}>✕</button>
+                        )}
+                    </div>
                     {selectedFiles.map((f, i) => (
                         <p key={f.name || i} className="action-file-name">{f.name}</p>
                     ))}

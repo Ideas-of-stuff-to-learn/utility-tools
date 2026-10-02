@@ -21,6 +21,13 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 
 ## Recently Completed
 
+**Dashboard left-column layout (2026-10-02):**
+- Removed `HomepageInfo` from dashboard left column (charts already show that data; height was causing default-state overflow)
+- Removed `overflow-y: auto` from `.dashboard-home-scroll` — default state has no column scroll
+- Added `useEffect` in Dashboard.jsx toggling `.allow-scroll` on `.app-shell-locked` when files/loading/error active — page-level scroll during upload, reverts automatically
+- Added ✕ dismiss button to `.action-file-list` header (hidden while loading)
+- Progress bar during manual categorise confirmed: `setStatus` called by both `runCacheTiers` and `runLlmTier`
+
 **Cashflow boot overhaul (2026-09-29):**
 - Root cause of the recurring return-visit cycle: `UserPreferencesContext` sent `GET /preferences` before `/auth/me`. The HMAC 401 led to a refresh with CSRF "null", then session-expired, then a bounce through landing `/login` and back.
 - `api.jsx`:

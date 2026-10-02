@@ -632,6 +632,37 @@
     border-bottom: none;
 }
 
+.action-file-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 4px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.action-file-list-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.action-file-dismiss {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+.action-file-dismiss:hover {
+    color: var(--text-primary);
+}
+
 .action-error-wrap {
     background: var(--bg-header-row);
     border: 1px solid var(--border-subtle);

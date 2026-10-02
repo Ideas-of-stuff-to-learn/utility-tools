@@ -1,4 +1,5 @@
 <!-- last-verified: 7e49833 2026-09-24 -->
+2026-10-02 | task: dashboard left-column — no default scroll, page scroll on upload, dismissible file list | SQLite queries: 0 | context docs loaded: 3 (compacted session summary, Dashboard.jsx, dashboardStyles.css) | full repo scan avoided: yes | 4 source files changed, build passes
 2026-09-27 | task: Task 25 — encrypted IndexedDB layer | SQLite queries: 0 | context docs loaded: 3 (current-task, backlog, plan) | full repo scan avoided: yes | 8 source files created/changed, 1 migration, Supabase + Render env updated
 2026-09-27 | task: admin.accounts.manage permission gate (sidebar + backend + weights) | SQLite queries: 0 | context docs loaded: 2 (compacted session summary, Sidebar.jsx) | full repo scan avoided: yes | resumed from compaction; 5 source files + 2 context docs changed
 2026-09-26 | task: add soft-launch + hard-launch checklists to backlog | SQLite queries: 0 | context docs loaded: 2 (backlog, revert-state) | full repo scan avoided: yes | docs-only update; no source code touched

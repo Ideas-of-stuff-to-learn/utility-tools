@@ -1,3 +1,40 @@
+## Session — 2026-10-02
+
+**Git HEAD:** `6362968` (unchanged — not yet shipped)
+**Files changed this session:**
+- `tools/cashflow/WebUI/src/screens/Dashboard.jsx` — removed HomepageInfo, added useEffect for page-scroll toggle
+- `tools/cashflow/WebUI/src/styles/dashboardStyles.css` — removed overflow-y: auto from dashboard-home-scroll
+- `tools/cashflow/WebUI/src/components/homepage/ActionButtons.jsx` — added ✕ dismiss button to file list header
+- `tools/cashflow/WebUI/src/styles/billing.css` — added action-file-list-header/count/dismiss CSS
+
+**What was done:** Dashboard left-column layout fixes — no scroll in default state, page-level scroll during upload, dismissible file list card.
+
+**Confirmed:** Progress bar works during manual "Automatically categorise" — setStatus called by both runCacheTiers and runLlmTier satisfies the (loading || status) gate.
+
+**Next:** Ship these changes (`/ship-main`), then test on deployed version.
+
+---
+
+## Pre-Compact Snapshot — 2026-09-30 22:54
+
+**Git HEAD:** `5979d78`
+**Files touched:** tools/cashflow/WebUI/src/components/homepage/ActionButtons.jsx, context/session-snapshot.md, context/handoff.md
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
+## Pre-Compact Snapshot — 2026-09-30 21:00
+
+**Git HEAD:** `46f77af`
+**Files touched:** (none — no uncommitted changes)
+**Active task:** (no active task)
+
+*(Auto-written by PreCompact hook — full snapshot in context/session-snapshot.md)*
+
+---
+
 ## Pre-Compact Snapshot — 2026-09-30 20:33
 
 **Git HEAD:** `df7faed`
