@@ -633,6 +633,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
 }
 
 .action-file-name:last-child {

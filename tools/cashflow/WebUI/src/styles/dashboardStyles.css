@@ -35,6 +35,11 @@
     flex-shrink: 0;
 }
 
+.dashboard-home-scroll > .action-file-list {
+    flex-shrink: 1;
+    min-height: 60px;
+}
+
 .dashboard-home-box .range-text {
     margin-bottom: 6px;
     text-align: left;
