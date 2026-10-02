@@ -31,6 +31,10 @@
     display: none;
 }
 
+.dashboard-home-scroll > * {
+    flex-shrink: 0;
+}
+
 .dashboard-home-box .range-text {
     margin-bottom: 6px;
     text-align: left;
